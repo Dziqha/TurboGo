@@ -1,5 +1,4 @@
-// rabbitmq/persist.go
-package rabbitmq
+package queue
 
 import (
 	"bufio"
@@ -51,7 +50,6 @@ func NewPersistent(logFile string) (*PersistentTaskQueue, error) {
 		tasks:     make(map[string]*Task),
 	}
 	
-	// Load pending tasks
 	if err := ptq.loadPendingTasks(); err != nil {
 		return nil, fmt.Errorf("failed to load pending tasks: %v", err)
 	}
@@ -60,7 +58,6 @@ func NewPersistent(logFile string) (*PersistentTaskQueue, error) {
 }
 
 func (ptq *PersistentTaskQueue) Enqueue(queue string, task []byte) error {
-	// Generate unique task ID
 	ptq.idMutex.Lock()
 	id := fmt.Sprintf("%d", ptq.taskID)
 	ptq.taskID++
@@ -80,7 +77,6 @@ func (ptq *PersistentTaskQueue) Enqueue(queue string, task []byte) error {
 	ptq.tasks[id] = taskObj
 	ptq.tasksMutex.Unlock()
 	
-	// Log task
 	if err := ptq.logTask(taskObj); err != nil {
 		return fmt.Errorf("failed to log task: %v", err)
 	}
@@ -104,7 +100,6 @@ func (ptq *PersistentTaskQueue) RegisterWorker(queue string, handler func([]byte
 		ptq.tasksMutex.RUnlock()
 		
 		if taskID != "" {
-			// Update task status
 			ptq.updateTaskStatus(taskID, "processing")
 		}
 		
@@ -275,7 +270,6 @@ func (ptq *PersistentTaskQueue) rewriteLogFile() error {
 		return fmt.Errorf("failed to replace log file: %v", err)
 	}
 	
-	// Reopen file
 	ptq.file, err = os.OpenFile(ptq.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	ptq.writeMutex.Unlock()
 	

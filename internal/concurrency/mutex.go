@@ -2,45 +2,36 @@ package concurrency
 
 import "sync"
 
-// SafeMap wraps a map with a RWMutex for safe concurrent access
-type SafeMap[K comparable, V any] struct {
-	mu      sync.RWMutex
-	mapData map[K]V
+// SafeValue adalah wrapper thread-safe untuk menyimpan nilai generic
+type SafeValue[T any] struct {
+	mu  sync.RWMutex
+	val T
 }
 
-// NewSafeMap creates a new concurrent-safe map
-func NewSafeMap[K comparable, V any]() *SafeMap[K, V] {
-	return &SafeMap[K, V]{
-		mapData: make(map[K]V),
-	}
-}
-
-// Set sets the key to the value
-func (s *SafeMap[K, V]) Set(key K, value V) {
+// Set mengatur nilai secara eksklusif
+func (s *SafeValue[T]) Set(val T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.mapData[key] = value
+	s.val = val
 }
 
-// Get returns the value for a key and a boolean if it exists
-func (s *SafeMap[K, V]) Get(key K) (V, bool) {
+// Get mengambil salinan nilai secara aman
+func (s *SafeValue[T]) Get() T {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	val, ok := s.mapData[key]
-	return val, ok
+	return s.val
 }
 
-// Delete removes a key from the map
-func (s *SafeMap[K, V]) Delete(key K) {
+// LockFn menjalankan fungsi dengan akses eksklusif ke val
+func (s *SafeValue[T]) LockFn(fn func(val *T)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.mapData, key)
+	fn(&s.val)
 }
 
-// Exists returns true if the key exists
-func (s *SafeMap[K, V]) Exists(key K) bool {
+// RLockFn menjalankan fungsi dengan akses baca ke val
+func (s *SafeValue[T]) RLockFn(fn func(val T)) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.mapData[key]
-	return ok
+	fn(s.val)
 }

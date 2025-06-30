@@ -1,30 +1,38 @@
 package core
 
 import (
-	"github.com/Dziqha/TurboGo/internal/kafka"
-	"github.com/Dziqha/TurboGo/internal/rabbitmq"
-	"github.com/Dziqha/TurboGo/internal/redis"
 	"encoding/json"
+
+	"github.com/Dziqha/TurboGo/internal/cache"
+	"github.com/Dziqha/TurboGo/internal/concurrency"
+	"github.com/Dziqha/TurboGo/internal/pubsub"
+	"github.com/Dziqha/TurboGo/internal/queue"
 
 	"github.com/valyala/fasthttp"
 )
 
 type Context struct {
 	Ctx   *fasthttp.RequestCtx
-	Redis *redis.Engine
-	Kafka *kafka.Engine
-	Queue *rabbitmq.Engine
+	Cache *cache.Engine
+	Pubsub *pubsub.Engine
+	Queue *queue.Engine
 	index    int
 	handlers []Handler
 	aborted bool
 
 }
 
-func NewContext(ctx *fasthttp.RequestCtx, redis *redis.Engine, kafka *kafka.Engine, queue *rabbitmq.Engine, handlers []Handler) *Context {
+type Dependencies struct {
+	Pubsub *pubsub.Engine
+	Queue  *queue.Engine
+}
+
+
+func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, pubsub *pubsub.Engine, queue *queue.Engine, handlers []Handler) *Context {
 	return &Context{
 		Ctx:      ctx,
-		Redis:    redis,
-		Kafka:    kafka,
+		Cache:    cache,
+		Pubsub:    pubsub,
 		Queue:    queue,
 		handlers: handlers,
 		index:    -1, // ⬅️  agar Next() mulai dari 0
@@ -88,3 +96,12 @@ func (c *Context) Abort() {
 }
 
 
+// Async menjalankan fungsi dalam goroutine tanpa block
+func (c *Context) Async(fn func()) {
+	concurrency.Async(fn)
+}
+
+// Parallel menjalankan banyak fungsi lalu menunggu semuanya selesai
+func (c *Context) Parallel(funcs ...func()) {
+	concurrency.WaitGroupRunner(funcs...)
+}

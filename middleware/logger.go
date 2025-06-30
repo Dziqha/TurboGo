@@ -16,7 +16,6 @@ func Logger() core.Handler {
 			duration := time.Since(start)
 			ns := max(duration.Nanoseconds(), 100)
 
-			// Warna durasi
 			var durationColor *color.Color
 			switch {
 			case ns > 10_000_000: // >10ms
@@ -27,7 +26,6 @@ func Logger() core.Handler {
 				durationColor = color.New(color.FgGreen)
 			}
 
-			// Format durasi asli
 			var durationStr string
 			switch {
 			case ns >= 1e9:

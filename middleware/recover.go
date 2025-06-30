@@ -1,5 +1,3 @@
-
-// recover.go
 package middleware
 
 import (

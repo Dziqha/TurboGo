@@ -1,5 +1,4 @@
-// redis/inmem.go
-package redis
+package cache
 
 import (
 	"sync"
@@ -11,15 +10,15 @@ type entry struct {
 	ExpiresAt *time.Time
 }
 
-type InMemRedis struct {
+type InMemCache struct {
 	mu      sync.RWMutex
 	store   map[string]entry
 	cleaner *time.Ticker
 	done    chan struct{}
 }
 
-func NewInMem() *InMemRedis {
-	r := &InMemRedis{
+func NewInMem() *InMemCache {
+	r := &InMemCache{
 		store: make(map[string]entry),
 		done:  make(chan struct{}),
 	}
@@ -30,7 +29,7 @@ func NewInMem() *InMemRedis {
 	return r
 }
 
-func (r *InMemRedis) Set(key string, value []byte, ttl time.Duration) {
+func (r *InMemCache) Set(key string, value []byte, ttl time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
@@ -46,7 +45,7 @@ func (r *InMemRedis) Set(key string, value []byte, ttl time.Duration) {
 	}
 }
 
-func (r *InMemRedis) Get(key string) ([]byte, bool) {
+func (r *InMemCache) Get(key string) ([]byte, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
@@ -67,7 +66,7 @@ func (r *InMemRedis) Get(key string) ([]byte, bool) {
 	return e.Value, true
 }
 
-func (r *InMemRedis) Delete(key string) bool {
+func (r *InMemCache) Delete(key string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
@@ -78,16 +77,16 @@ func (r *InMemRedis) Delete(key string) bool {
 	return ok
 }
 
-func (r *InMemRedis) Exists(key string) bool {
+func (r *InMemCache) Exists(key string) bool {
 	_, exists := r.Get(key)
 	return exists
 }
 
-func (r *InMemRedis) SetEx(key string, value []byte, seconds int) {
+func (r *InMemCache) SetEx(key string, value []byte, seconds int) {
 	r.Set(key, value, time.Duration(seconds)*time.Second)
 }
 
-func (r *InMemRedis) SetNX(key string, value []byte, ttl time.Duration) bool {
+func (r *InMemCache) SetNX(key string, value []byte, ttl time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
@@ -110,7 +109,7 @@ func (r *InMemRedis) SetNX(key string, value []byte, ttl time.Duration) bool {
 	return true
 }
 
-func (r *InMemRedis) cleanup() {
+func (r *InMemCache) cleanup() {
 	for {
 		select {
 		case <-r.cleaner.C:
@@ -121,7 +120,7 @@ func (r *InMemRedis) cleanup() {
 	}
 }
 
-func (r *InMemRedis) cleanupExpired() {
+func (r *InMemCache) cleanupExpired() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
@@ -133,7 +132,7 @@ func (r *InMemRedis) cleanupExpired() {
 	}
 }
 
-func (r *InMemRedis) Close() {
+func (r *InMemCache) Close() {
 	close(r.done)
 	if r.cleaner != nil {
 		r.cleaner.Stop()
@@ -144,14 +143,14 @@ func (r *InMemRedis) Close() {
 	r.store = make(map[string]entry)
 }
 
-func (r *InMemRedis) Size() int {
+func (r *InMemCache) Size() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.store)
 }
 
 
-func (r *InMemRedis) TTL(key string) time.Duration {
+func (r *InMemCache) TTL(key string) time.Duration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -173,7 +172,7 @@ func (r *InMemRedis) TTL(key string) time.Duration {
 }
 
 
-func (r *InMemRedis) Range(fn func(key string, value []byte)) {
+func (r *InMemCache) Range(fn func(key string, value []byte)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for k, v := range r.store {

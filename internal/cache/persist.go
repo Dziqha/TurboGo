@@ -1,5 +1,4 @@
-// redis/persist.go
-package redis
+package cache
 
 import (
 	"encoding/json"
@@ -10,8 +9,8 @@ import (
 	"time"
 )
 
-type PersistentRedis struct {
-	*InMemRedis
+type PersistentCache struct {
+	*InMemCache
 	dataFile   string
 	autoSave   bool
 	saveTimer  *time.Ticker
@@ -22,11 +21,11 @@ type persistData struct {
 	Store map[string]entry `json:"store"`
 }
 
-func NewPersistent(dataFile string, autoSave bool) (*PersistentRedis, error) {
+func NewPersistent(dataFile string, autoSave bool) (*PersistentCache, error) {
 	inMem := NewInMem()
 	
-	pr := &PersistentRedis{
-		InMemRedis: inMem,
+	pr := &PersistentCache{
+		InMemCache: inMem,
 		dataFile:   dataFile,
 		autoSave:   autoSave,
 	}
@@ -50,22 +49,22 @@ func NewPersistent(dataFile string, autoSave bool) (*PersistentRedis, error) {
 	return pr, nil
 }
 
-func (pr *PersistentRedis) Set(key string, value []byte, ttl time.Duration) {
-	pr.InMemRedis.Set(key, value, ttl)
+func (pr *PersistentCache) Set(key string, value []byte, ttl time.Duration) {
+	pr.InMemCache.Set(key, value, ttl)
 	if pr.autoSave {
 		go pr.asyncSave()
 	}
 }
 
-func (pr *PersistentRedis) Delete(key string) bool {
-	result := pr.InMemRedis.Delete(key)
+func (pr *PersistentCache) Delete(key string) bool {
+	result := pr.InMemCache.Delete(key)
 	if pr.autoSave && result {
 		go pr.asyncSave()
 	}
 	return result
 }
 
-func (pr *PersistentRedis) Save() error {
+func (pr *PersistentCache) Save() error {
 	pr.saveMutex.Lock()
 	defer pr.saveMutex.Unlock()
 	
@@ -106,7 +105,7 @@ func (pr *PersistentRedis) Save() error {
 	return nil
 }
 
-func (pr *PersistentRedis) Load() error {
+func (pr *PersistentCache) Load() error {
 	file, err := os.Open(pr.dataFile)
 	if err != nil {
 		return err
@@ -133,7 +132,7 @@ func (pr *PersistentRedis) Load() error {
 	return nil
 }
 
-func (pr *PersistentRedis) asyncSave() {
+func (pr *PersistentCache) asyncSave() {
 	select {
 	case <-time.After(100 * time.Millisecond):
 		pr.Save()
@@ -142,7 +141,7 @@ func (pr *PersistentRedis) asyncSave() {
 	}
 }
 
-func (pr *PersistentRedis) autoSaveLoop() {
+func (pr *PersistentCache) autoSaveLoop() {
 	for {
 		select {
 		case <-pr.saveTimer.C:
@@ -153,7 +152,7 @@ func (pr *PersistentRedis) autoSaveLoop() {
 	}
 }
 
-func (pr *PersistentRedis) Close() {
+func (pr *PersistentCache) Close() {
 	if pr.saveTimer != nil {
 		pr.saveTimer.Stop()
 	}
@@ -161,5 +160,5 @@ func (pr *PersistentRedis) Close() {
 	// Final save
 	pr.Save()
 	
-	pr.InMemRedis.Close()
+	pr.InMemCache.Close()
 }

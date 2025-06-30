@@ -1,4 +1,4 @@
-package kafka
+package pubsub
 
 import (
 	"bufio"
@@ -29,13 +29,10 @@ type PersistentEventBus struct {
 
 func NewPersistent(logFile string) (*PersistentEventBus, error) {
 	inMem := NewInMem()
-	
-	// Create directory if not exists
 	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %v", err)
 	}
 	
-	// Open log file for append
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %v", err)
@@ -52,7 +49,6 @@ func NewPersistent(logFile string) (*PersistentEventBus, error) {
 }
 
 func (peb *PersistentEventBus) Publish(topic string, msg []byte) error {
-	// Generate unique message ID
 	peb.idMutex.Lock()
 	id := fmt.Sprintf("%d", peb.messageID)
 	peb.messageID++
@@ -65,12 +61,10 @@ func (peb *PersistentEventBus) Publish(topic string, msg []byte) error {
 		ID:        id,
 	}
 	
-	// Log message to file
 	if err := peb.logMessage(message); err != nil {
 		return fmt.Errorf("failed to log message: %v", err)
 	}
 	
-	// Publish in-memory if not in replay mode
 	if !peb.replayMode {
 		return peb.EventBus.Publish(topic, msg)
 	}
@@ -99,11 +93,10 @@ func (peb *PersistentEventBus) Replay(fromTime *time.Time, toTime *time.Time) er
 	peb.replayMode = true
 	defer func() { peb.replayMode = false }()
 	
-	// Open file for reading
 	file, err := os.Open(peb.logFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // No log file, nothing to replay
+			return nil 
 		}
 		return fmt.Errorf("failed to open log file for replay: %v", err)
 	}
@@ -113,10 +106,9 @@ func (peb *PersistentEventBus) Replay(fromTime *time.Time, toTime *time.Time) er
 	for scanner.Scan() {
 		var msg Message
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
-			continue // Skip invalid messages
+			continue 
 		}
 		
-		// Filter by time range if specified
 		if fromTime != nil && msg.Timestamp.Before(*fromTime) {
 			continue
 		}
@@ -124,7 +116,6 @@ func (peb *PersistentEventBus) Replay(fromTime *time.Time, toTime *time.Time) er
 			continue
 		}
 		
-		// Replay message
 		peb.EventBus.Publish(msg.Topic, msg.Data)
 	}
 	
@@ -162,7 +153,6 @@ func (peb *PersistentEventBus) GetMessageHistory(topic string, limit int) ([]Mes
 }
 
 func (peb *PersistentEventBus) Compact() error {
-	// Create temp file
 	tempFile := peb.logFile + ".tmp"
 	temp, err := os.Create(tempFile)
 	if err != nil {
@@ -170,7 +160,6 @@ func (peb *PersistentEventBus) Compact() error {
 	}
 	defer temp.Close()
 	
-	// Read and filter recent messages (last 24 hours)
 	cutoff := time.Now().Add(-24 * time.Hour)
 	messages, err := peb.GetMessageHistory("", 0)
 	if err != nil {
@@ -178,7 +167,6 @@ func (peb *PersistentEventBus) Compact() error {
 		return err
 	}
 	
-	// Write recent messages to temp file
 	for _, msg := range messages {
 		if msg.Timestamp.After(cutoff) {
 			data, err := json.Marshal(msg)
@@ -191,7 +179,6 @@ func (peb *PersistentEventBus) Compact() error {
 	
 	temp.Close()
 	
-	// Replace original file
 	peb.writeMutex.Lock()
 	peb.file.Close()
 	
@@ -201,7 +188,6 @@ func (peb *PersistentEventBus) Compact() error {
 		return fmt.Errorf("failed to replace log file: %v", err)
 	}
 	
-	// Reopen file
 	peb.file, err = os.OpenFile(peb.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	peb.writeMutex.Unlock()
 	

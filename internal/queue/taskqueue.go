@@ -1,5 +1,4 @@
-// rabbitmq/taskqueue.go
-package rabbitmq
+package queue
 
 import (
 	"context"
@@ -27,20 +26,21 @@ func (q *TaskQueue) Enqueue(queue string, task []byte) error {
 	ch, ok := q.queues[queue]
 	closed := q.closed
 	q.mu.RUnlock()
-	
+
 	if closed {
 		return errors.New("task queue is closed")
 	}
-	
+
 	if !ok {
 		q.mu.Lock()
-		if ch, ok = q.queues[queue]; !ok {
-			ch = make(chan []byte, 100)
+		ch, ok = q.queues[queue]
+		if !ok {
+			ch = make(chan []byte, 10000) // ✅ buffer besar agar tidak deadlock
 			q.queues[queue] = ch
 		}
 		q.mu.Unlock()
 	}
-	
+
 	select {
 	case ch <- task:
 		return nil
@@ -52,39 +52,38 @@ func (q *TaskQueue) Enqueue(queue string, task []byte) error {
 func (q *TaskQueue) RegisterWorker(queue string, handler func([]byte) error) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return errors.New("task queue is closed")
 	}
-	
 	ch, ok := q.queues[queue]
 	if !ok {
-		ch = make(chan []byte, 100)
+		ch = make(chan []byte, 10000) // ✅ buffer besar agar tidak deadlock saat enqueue masif
 		q.queues[queue] = ch
 	}
-	
+
+	// Daftarkan context cancel, agar bisa graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	q.workers[queue] = append(q.workers[queue], cancel)
-	
+
+	// Jalankan worker dalam goroutine
 	go func() {
-		defer cancel()
 		for {
 			select {
 			case msg, ok := <-ch:
 				if !ok {
-					return
+					return // channel ditutup
 				}
-				if err := handler(msg); err != nil {
-					// Log error or implement retry logic
-				}
+				_ = handler(msg) // abaikan error untuk sekarang
 			case <-ctx.Done():
-				return
+				return // shutdown
 			}
 		}
 	}()
-	
+
 	return nil
 }
+
 
 func (q *TaskQueue) GetQueueSize(queue string) int {
 	q.mu.RLock()

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Dziqha/TurboGo/internal/concurrency"
 	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
 )
-
 
 type Handler func(*Context)
 
@@ -28,7 +28,6 @@ type Router interface {
 	All(path string, handler Handler, handlers ...Handler) *Route
 
 	Group(prefix string, handlers ...Handler) Router
-
 	Route(path string) *Route
 }
 
@@ -43,11 +42,10 @@ type Route struct {
 	Name     string
 	Handlers []Handler
 	Options  routeOptions
-	app      RouterApp // Interface untuk app
-	methods  []string  // Store original methods
+	app      RouterApp
+	methods  []string
 }
 
-// Interface untuk App yang dibutuhkan oleh Route
 type RouterApp interface {
 	GetRoutes() []*Route
 	SetRoutes([]*Route)
@@ -81,9 +79,7 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 		Handlers: finalHandlers,
 		app:      app,
 		methods:  methods,
-		Options: routeOptions{
-			disable: false,
-		},
+		Options: routeOptions{disable: false},
 	}
 
 	routes := app.GetRoutes()
@@ -117,44 +113,25 @@ func withCacheInjection(method, path string, handlers []Handler, ttl time.Durati
 	cacheMiddleware := func(c *Context) {
 		start := time.Now()
 
-		// Cache HIT
-		if val, ok := c.Redis.Memory.Get(cacheKey); ok {
-			_ = len(val) // Dummy operasi biar gak dioptimasi
-
+		if val, ok := c.Cache.Memory.Get(cacheKey); ok {
 			status := c.Ctx.Response.StatusCode()
 			if status == 0 {
 				status = fasthttp.StatusOK
 			}
 
 			c.Ctx.SetBody(val)
-
-			duration := time.Since(start)
-			ns := max(duration.Nanoseconds(), 100)
-
-			var durationStr string
-			switch {
-			case ns >= 1e9:
-				durationStr = fmt.Sprintf("%.3fs", float64(ns)/1e9)
-			case ns >= 1e6:
-				durationStr = fmt.Sprintf("%.3fms", float64(ns)/1e6)
-			case ns >= 1e3:
-				durationStr = fmt.Sprintf("%.3fµs", float64(ns)/1e3)
-			default:
-				durationStr = fmt.Sprintf("%dns", ns)
-			}
-
-			Log.Debug("[CACHE] HIT    : %s %s [%3d] (%s)", method, path, status, durationStr)
 			c.Abort()
+
+			ns := max(time.Since(start).Nanoseconds(), 100)
+			Log.Debug("[CACHE] HIT    : %s %s [%3d] (%s)", method, path, status, formatDuration(ns))
 			return
 		}
 
-		// Cache MISS
 		Log.Debug("[CACHE] MISS   : %s %s", method, path)
 
 		original := c.Ctx.Response.Body()
 		c.Ctx.Response.ResetBody()
 
-		// Proses handler biasa
 		c.Next()
 
 		status := c.Ctx.Response.StatusCode()
@@ -162,33 +139,43 @@ func withCacheInjection(method, path string, handlers []Handler, ttl time.Durati
 			status = fasthttp.StatusOK
 		}
 
-		// Simpan ke cache
-		c.Redis.Memory.Set(cacheKey, c.Ctx.Response.Body(), ttl)
-		Log.Debug("[CACHE] STORED : %s (TTL: %v)", cacheKey, ttl)
+		// Simpan ke cache secara async (non-blocking)
+		bodyCopy := c.Ctx.Response.Body()
+		concurrency.Async(func() {
+			c.Cache.Memory.Set(cacheKey, bodyCopy, ttl)
+			Log.Debug("[CACHE] STORED : %s (TTL: %v)", cacheKey, ttl)
+		})
 
-		duration := time.Since(start)
-		ns := max(duration.Nanoseconds(), 100)
+		ns := max(time.Since(start).Nanoseconds(), 100)
+		Log.Debug("→ %-7s %-30s [%3d] (%s)", method, path, status, formatDuration(ns))
 
-		var durationStr string
-		switch {
-		case ns >= 1e9:
-			durationStr = fmt.Sprintf("%.3fs", float64(ns)/1e9)
-		case ns >= 1e6:
-			durationStr = fmt.Sprintf("%.3fms", float64(ns)/1e6)
-		case ns >= 1e3:
-			durationStr = fmt.Sprintf("%.3fµs", float64(ns)/1e3)
-		default:
-			durationStr = fmt.Sprintf("%dns", ns)
-		}
-
-		Log.Debug("→ %-7s %-30s [%3d] (%s)", method, path, status, durationStr)
-
-		// Restore original body (jika perlu)
 		c.Ctx.Response.AppendBody(original)
 	}
 
 	return append([]Handler{cacheMiddleware}, handlers...)
 }
+
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func formatDuration(ns int64) string {
+	switch {
+	case ns >= 1e9:
+		return fmt.Sprintf("%.3fs", float64(ns)/1e9)
+	case ns >= 1e6:
+		return fmt.Sprintf("%.3fms", float64(ns)/1e6)
+	case ns >= 1e3:
+		return fmt.Sprintf("%.3fµs", float64(ns)/1e3)
+	default:
+		return fmt.Sprintf("%dns", ns)
+	}
+}
+
+// ==================== GROUP ====================
 
 type Group struct {
 	Prefix     string
@@ -253,7 +240,6 @@ func (g *Group) All(path string, h Handler, hs ...Handler) *Route {
 }
 
 func (g *Group) Route(path string) *Route {
-	// Implement route finding logic for groups
 	for _, r := range g.Parent.GetRoutes() {
 		if r.Path == path {
 			return r

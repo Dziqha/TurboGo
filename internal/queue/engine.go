@@ -1,4 +1,4 @@
-package rabbitmq
+package queue
 
 
 type Engine struct {
@@ -9,7 +9,7 @@ type Engine struct {
 
 
 func NewEngine() (*Engine, error) {
-	persist, err := NewPersistent("data/rabbitmq.json")
+	persist, err := NewPersistent("data/queue.json")
 	if err != nil {
 		return nil, err
 	}

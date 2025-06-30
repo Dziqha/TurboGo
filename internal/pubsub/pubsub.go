@@ -1,5 +1,4 @@
-// kafka/pubsub.go
-package kafka
+package pubsub
 
 import (
 	"errors"
@@ -46,10 +45,25 @@ func (b *EventBus) Subscribe(topic string) <-chan []byte {
 		return nil
 	}
 	
-	ch := make(chan []byte, 10)
+	ch := make(chan []byte, 10000)
 	b.topics[topic] = append(b.topics[topic], ch)
 	return ch
 }
+
+func (b *EventBus) SubscribeRaw(topic string) (<-chan []byte, error) {
+	if b.closed {
+		return nil, errors.New("eventbus is closed")
+	}
+
+	ch := make(chan []byte, 10000)
+
+	b.mu.Lock()
+	b.topics[topic] = append(b.topics[topic], ch)
+	b.mu.Unlock()
+
+	return ch, nil
+}
+
 
 func (b *EventBus) Unsubscribe(topic string, ch <-chan []byte) {
 	b.mu.Lock()
@@ -64,6 +78,18 @@ func (b *EventBus) Unsubscribe(topic string, ch <-chan []byte) {
 		}
 	}
 }
+
+func (b *EventBus) UnsubscribeAll(topic string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	chs := b.topics[topic]
+	for _, ch := range chs {
+		close(ch)
+	}
+	delete(b.topics, topic)
+}
+
 
 func (b *EventBus) GetTopics() []string {
 	b.mu.RLock()

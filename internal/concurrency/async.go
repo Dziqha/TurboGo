@@ -1,21 +1,26 @@
 package concurrency
 
 import "sync"
-
-// RunAsync runs a function asynchronously in a goroutine and tracks its completion
-func RunAsync(wg *sync.WaitGroup, fn func()) {
-	wg.Add(1)
+func Async(fn func()) {
 	go func() {
-		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				
+				panic(r)
+			}
+		}()
 		fn()
 	}()
 }
 
-// RunParallel runs multiple functions in parallel and waits for all to finish
-func RunParallel(fns ...func()) {
+func WaitGroupRunner(funcs ...func()) {
 	var wg sync.WaitGroup
-	for _, fn := range fns {
-		RunAsync(&wg, fn)
+	for _, fn := range funcs {
+		wg.Add(1)
+		go func(f func()) {
+			defer wg.Done()
+			f()
+		}(fn)
 	}
 	wg.Wait()
 }

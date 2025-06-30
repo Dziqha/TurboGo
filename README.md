@@ -1,11 +1,35 @@
+# 🌀 TurboGo — High Performance Middleware-First Go Framework
 
-# TurboGo Framework Architecture
+[![Go](https://img.shields.io/badge/Go-1.22-blue)](https://go.dev)
+[![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/Coverage-ComingSoon-yellow)]()
 
-TurboGo is a middleware-first, event-driven Go backend framework focused on performance and developer experience. Below is the detailed architecture flow.
+TurboGo adalah framework backend berbasis Go yang ringan, middleware-first, dan event-driven. Fokus utama pada kecepatan, kemudahan extensibility, dan developer experience.
 
 ---
 
-## 🧭 Request Lifecycle
+## 📁 Project Structure
+
+```
+turbogo/
+├── cmd/                # CLI commands (generate, etc)
+├── core/               # HTTP context, router, logger, handler base
+├── internal/           # Engine untuk cache, pubsub, queue, concurrency
+│   ├── cache/          # Redis-like engine (in-memory)
+│   ├── pubsub/         # Kafka-style pubsub engine
+│   ├── queue/          # RabbitMQ-style task queue
+│   └── concurrency/    # Utility async/goroutine/mutex helpers
+├── middleware/         # Auth, Logger, Recovery, Cache layer
+├── examples/           # Example main.go app
+├── test/               # Benchmark & unit test
+├── app.go              # Main app entry
+├── makefile
+└── README.md
+```
+
+---
+
+## 🧭 Request Lifecycle Overview
 
 ```
                            ┌────────────┐
@@ -45,79 +69,59 @@ TurboGo is a middleware-first, event-driven Go backend framework focused on perf
                         Response + Cache Set
 ```
 
+---
+
+## 🔐 Middleware: Auth Example
+
+Gunakan `AUTH_SECRET` dari environment:
+
+```go
+app.Use(middleware.Auth(os.Getenv("AUTH_SECRET")))
+```
+
+Atur env:
+```bash
+export AUTH_SECRET=supersecurekey123
+```
 
 ---
 
 ## 📦 Layer Breakdown
 
-| Layer/Komponen              | File / Modul                         | Deskripsi                                                                 |
-|-----------------------------|--------------------------------------|--------------------------------------------------------------------------|
-| **Client**                  | Browser, curl, postman               | Mengirim request ke server                                               |
-| **HTTP Router**             | `core/routing.go`                    | Menyediakan `.Get`, `.Post`, dll                                         |
-| **Middleware Pipeline**     | `middleware/*.go`                    | Logger, Cache, Auth, Recovery                                            |
-| **Redis Auto-Cache Layer**  | `middleware/cache.go`                | Otomatis menyimpan dan mengambil cache berdasarkan path atau key         |
-| **Handler Logic**           | `handlers/*.go`                      | Fungsi-fungsi buatan developer                                           |
-| **Internal Task Engine**    | `core/context.go` + `internal/*`     | Pipeline event-driven (Kafka, RabbitMQ, Redis, dll)                      |
-| **Concurrency Tools**       | `internal/concurrency/`              | Goroutine, channel, mutex bawaan Go                                      |
-| **Final Response**          | `ctx.JSON(...)`                      | Menyimpan ke cache (jika aktif) + kirim respons ke user                  |
+| Layer                | File                            | Deskripsi                                               |
+|---------------------|----------------------------------|----------------------------------------------------------|
+| Router              | `core/routing.go`                | Basic `.Get()`, `.Post()` route register                |
+| Middleware          | `middleware/logger.go`, `auth.go`| Middleware pipeline (logger, auth, recovery, cache)     |
+| Redis Auto-Cache    | `middleware/cache.go`            | Cek dan simpan response otomatis via path/key           |
+| Handler             | `handlers/*.go`                  | Business logic dibuat oleh developer                    |
+| Embedded Engines    | `internal/*`                     | TaskQueue, PubSub, dan Cache in-memory engine           |
+| Concurrency Tools   | `internal/concurrency/*.go`      | Channel pool, goroutine control, mutex helper           |
 
 ---
 
-## 🧱 Modular File Structure (v1)
+## 📊 Benchmark Summary
 
+> Jalankan:
+```bash
+make bench
+```
 
-```
-turbogo/
-├── cmd/
-│   └── root.go
-├── core/
-│   ├── app.go
-│   ├── context.go
-│   ├── routing.go
-│   └── config.go
-├── internal/
-│   ├── redis/
-│   │   ├── inmem.go
-│   │   └── persist.go
-│   ├── kafka/
-│   │   ├── pubsub.go
-│   │   └── persist.go
-│   ├── rabbitmq/
-│   │   ├── taskqueue.go
-│   │   └── persist.go
-│   └── concurrency/
-│       ├── async.go
-│       └── mutex.go
-├── middleware/
-│   ├── cache.go
-│   ├── logger.go
-│   ├── recover.go
-│   └── auth.go
-├── pkg/
-│   └── jsonutil/
-├── examples/
-│   └── main.go
-├── test/
-│   └── all_test.go
-└── README.md
-```
+| Benchmark                        | ns/op    | Mem | Alloc | Status |
+|----------------------------------|----------|------|--------|--------|
+| `BenchmarkPubSub_1000Messages`   | ~265     | 249B | 4x     | ✅     |
+| `BenchmarkTaskQueue_1000Tasks`   | ~0.02    | 0B   | 0      | ✅     |
+| `BenchmarkTaskQueue_WithDelay`   | ~0.17    | 0B   | 0      | ✅     |
+| `BenchmarkTaskQueue_CPUProfile`  | ~592     | 4B   | 1x     | ✅     |
 
 ---
 
-## ✅ Summary
+## ✅ Goals
 
-TurboGo menggabungkan kekuatan:
-
-- 🧠 Clean Architecture
-- ⚙️ Middleware-first Design
-- 🚀 Event-Driven Flow
-- ⚡ Built-in Concurrency (goroutine, channel)
-- 📦 Auto Redis Caching
-- 📮 Kafka + RabbitMQ Integration
-
-```
-💡 Goal: One route = one powerful pipeline, without boilerplate.
-```
+- ⚙️ Middleware-first, seperti Express
+- 📮 Mendukung Kafka, RabbitMQ tanpa import eksternal
+- ⚡ Sangat cepat (sub-microsecond op)
+- 🧠 Clean code & extensible
+- ✅ Siap digunakan untuk proyek microservice, REST API, atau pubsub pipelines
 
 ---
 

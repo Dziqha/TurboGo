@@ -8,42 +8,68 @@ import (
 	"time"
 )
 
+func PublicHandler(c *core.Context) {
+	c.JSON(200, map[string]any{
+		"message": "this is public content",
+	})
+}
+
+func PrivateHandler(c *core.Context) {
+	c.JSON(200, map[string]any{
+		"user": "admin",
+	})
+}
+
+func HeavyHandler(c *core.Context) {
+	// Simulasi proses berat
+	time.Sleep(2 * time.Second)
+	c.JSON(200, map[string]any{
+		"data": "processed",
+	})
+}
+
+
 func main() {
 	app := TurboGo.New()
+	secret := "supersecurekey123"
 	app.Use(
-		middleware.Recover(), // selalu paling atas
-		middleware.Logger(),  // log seluruh proses
-		middleware.Auth(),    // auth sebelum cache
+		middleware.Recover(), 
+		middleware.Logger(),  
+		middleware.Auth(secret),   
 		
 	)
+
 	
+	app.Get("/public", PublicHandler)
+
+	// ⛔ No cache: override dengan .NoCache()
+	app.Get("/private", PrivateHandler).NoCache()
+
+	// ⚠️ POST normally no-cache, tapi bisa di-cache pakai .Cache()
+	app.Post("/heavy", HeavyHandler).Cache(5 * time.Second)
 	
-	// Route demo
 	app.Get("/hello", func(c *core.Context) {
 
 		c.Text(200, "Hello TurboGo!")
 	}).NoCache()
 	
 	app.Get("/test-redis", func(c *core.Context) {
-		// Set key (tanpa err karena tidak return apa-apa)
-		c.Redis.Memory.Set("test", []byte("TurboGo"), 10*time.Second)
+		c.Cache.Memory.Set("test", []byte("TurboGo"), 10*time.Second)
 	
-		// Get key (misal nil = not found)
-		val, _ := c.Redis.Memory.Get("test")
+		val, _ := c.Cache.Memory.Get("test")
 		if val == nil {
 			c.JSON(404, map[string]string{"error": "not found"})
 			return
 		}
 	
-		// Return result
 		c.JSON(200, map[string]string{
-			"redis_value": string(val),
+			"cache_value": string(val),
 		})
 	})
 
 	app.Get("/ttl/:key", func(c *core.Context) {
 		key := c.Param("key")
-		ttl := c.Redis.Memory.TTL(key)
+		ttl := c.Cache.Memory.TTL(key)
 	
 		switch {
 		case ttl == -2*time.Second:
@@ -63,13 +89,12 @@ func main() {
 	
 	app.Get("/debug/redis/keys", func(c *core.Context) {
 		keys := make([]string, 0)
-		c.Redis.Memory.Range(func(k string, _ []byte) {
+		c.Cache.Memory.Range(func(k string, _ []byte) {
 			keys = append(keys, k)
 		})
 		c.JSON(200, keys)
 	})
 	
 
-	// Start server
 	app.Listen(":8080")
 }

@@ -1,16 +1,17 @@
-package redis
+package pubsub
+
 
 type Engine struct {
-	Memory  *InMemRedis  // from inmem.go
-	Storage *PersistentRedis  // from persist.go
+	Memory  *EventBus
+	Storage *PersistentEventBus
 }
 
+
 func NewEngine() (*Engine, error) {
-	persist, err := NewPersistent("data/redis.json", false)
+	persist, err := NewPersistent("data/pubsub.json")
 	if err != nil {
 		return nil, err
 	}
-
 	return &Engine{
 		Memory:  NewInMem(),
 		Storage: persist,
