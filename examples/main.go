@@ -1,14 +1,16 @@
 package main
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/Dziqha/TurboGo"
 	"github.com/Dziqha/TurboGo/core"
 	"github.com/Dziqha/TurboGo/middleware"
-	_ "fmt"
-	"time"
 )
 
 func PublicHandler(c *core.Context) {
+	fmt.Println("🔥 PublicHandler jalan")
 	c.JSON(200, map[string]any{
 		"message": "this is public content",
 	})
@@ -34,10 +36,9 @@ func main() {
 	secret := "supersecurekey123"
 	app.Use(
 		middleware.Recover(), 
-		middleware.Logger(),  
 		middleware.Auth(secret),   
 		
-	)
+	)	
 
 	
 	app.Get("/public", PublicHandler)

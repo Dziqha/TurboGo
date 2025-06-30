@@ -41,9 +41,10 @@ func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, pubsub *pubsub.En
 
 
 // JSON writes a JSON response
-func (c *Context) JSON(code int, data any) {
-	c.Ctx.SetStatusCode(code)
+func (c *Context) JSON(status int, data any) {
+	c.Ctx.SetStatusCode(status)
 	c.Ctx.SetContentType("application/json")
+
 	res, err := json.Marshal(data)
 	if err != nil {
 		c.Ctx.SetStatusCode(fasthttp.StatusInternalServerError)
@@ -52,6 +53,8 @@ func (c *Context) JSON(code int, data any) {
 	}
 	c.Ctx.SetBody(res)
 }
+
+
 
 // Text writes a plain text response
 func (c *Context) Text(code int, msg string) {
@@ -93,6 +96,10 @@ func (c *Context) Next() {
 
 func (c *Context) Abort() {
 	c.aborted = true
+}
+
+func (c *Context) Aborted() bool {
+	return c.aborted
 }
 
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Dziqha/TurboGo/internal/concurrency"
 	"github.com/fasthttp/router"
+	"github.com/fatih/color"
 	"github.com/valyala/fasthttp"
 )
 
@@ -71,41 +72,49 @@ func (r *Route) Named(name string) *Route {
 }
 
 func AddRoute(app RouterApp, methods []string, path string, handler Handler, handlers ...Handler) *Route {
-	allHandlers := append([]Handler{handler}, handlers...)
-	finalHandlers := append(app.GetMiddleware(), allHandlers...)
+	baseHandlers := append([]Handler{handler}, handlers...)
+	middleware := app.GetMiddleware()
 
 	route := &Route{
 		Path:     path,
-		Handlers: finalHandlers,
+		Handlers: append(middleware, baseHandlers...),
 		app:      app,
 		methods:  methods,
-		Options: routeOptions{disable: false},
+		Options:  routeOptions{disable: false},
 	}
 
-	routes := app.GetRoutes()
-	routes = append(routes, route)
-	app.SetRoutes(routes)
-
+	app.SetRoutes(append(app.GetRoutes(), route))
 	for _, method := range methods {
 		route.Method = method
-
-		ttl := 5 * time.Minute
-		if route.Options.ttl != nil {
-			ttl = *route.Options.ttl
-		}
-
-		var handlerChain []Handler
-		if route.Options.disable {
-			handlerChain = finalHandlers
-		} else {
-			handlerChain = withCacheInjection(method, path, finalHandlers, ttl)
-		}
-
-		app.GetRouter().Handle(method, path, app.WrapHandlers(handlerChain))
+	
+		app.GetRouter().Handle(method, path, app.WrapHandlers([]Handler{
+			func(c *Context) {
+				handlers := append(middleware, baseHandlers...)
+	
+				if !route.Options.disable {
+					ttl := 5 * time.Minute
+					if route.Options.ttl != nil {
+						ttl = *route.Options.ttl
+					}
+					handlers = withCacheInjection(method, path, handlers, ttl)
+				} else {
+					Log.Debug("[CACHE] DISABLED: %s %s", method, path)
+				}
+	
+				LoggerWrap(c, handlers)
+				for _, h := range handlers {
+					h(c)
+					if c.aborted {
+						break
+					}
+				}
+			},
+		}))
 	}
-
+	
 	return route
 }
+
 
 func withCacheInjection(method, path string, handlers []Handler, ttl time.Duration) []Handler {
 	cacheKey := fmt.Sprintf("cache:%s:%s", method, path)
@@ -114,46 +123,52 @@ func withCacheInjection(method, path string, handlers []Handler, ttl time.Durati
 		start := time.Now()
 
 		if val, ok := c.Cache.Memory.Get(cacheKey); ok {
-			status := c.Ctx.Response.StatusCode()
-			if status == 0 {
-				status = fasthttp.StatusOK
-			}
-
+			c.Ctx.SetStatusCode(200)
+			c.Ctx.SetContentType("application/json")
 			c.Ctx.SetBody(val)
 			c.Abort()
 
 			ns := max(time.Since(start).Nanoseconds(), 100)
-			Log.Debug("[CACHE] HIT    : %s %s [%3d] (%s)", method, path, status, formatDuration(ns))
+			Log.Debug("[CACHE] HIT    : %s %s [%3d] (%s)", method, path, 200, formatDuration(ns))
 			return
 		}
 
 		Log.Debug("[CACHE] MISS   : %s %s", method, path)
 
-		original := c.Ctx.Response.Body()
-		c.Ctx.Response.ResetBody()
-
 		c.Next()
 
+		body := c.Ctx.Response.Body()
 		status := c.Ctx.Response.StatusCode()
 		if status == 0 {
-			status = fasthttp.StatusOK
+			if c.aborted {
+				status = fasthttp.StatusUnauthorized // ✅ fallback aman kalau aborted
+			} else {
+				status = fasthttp.StatusOK
+			}
+			c.Ctx.SetStatusCode(status)
 		}
 
-		// Simpan ke cache secara async (non-blocking)
-		bodyCopy := c.Ctx.Response.Body()
-		concurrency.Async(func() {
-			c.Cache.Memory.Set(cacheKey, bodyCopy, ttl)
-			Log.Debug("[CACHE] STORED : %s (TTL: %v)", cacheKey, ttl)
-		})
+		
+
+		if status >= 200 && status < 300 && len(body) > 0 {
+			bodyCopy := make([]byte, len(body))
+			copy(bodyCopy, body)
+
+			concurrency.Async(func() {
+				c.Cache.Memory.Set(cacheKey, bodyCopy, ttl)
+				Log.Debug("[CACHE] STORED : %s (TTL: %v)", cacheKey, ttl)
+			})
+		} else {
+			Log.Debug("[CACHE] SKIPPED: %s %s [%3d] body: %d bytes", method, path, status, len(body))
+		}
 
 		ns := max(time.Since(start).Nanoseconds(), 100)
 		Log.Debug("→ %-7s %-30s [%3d] (%s)", method, path, status, formatDuration(ns))
-
-		c.Ctx.Response.AppendBody(original)
 	}
 
 	return append([]Handler{cacheMiddleware}, handlers...)
 }
+
 
 func max(a, b int64) int64 {
 	if a > b {
@@ -173,6 +188,73 @@ func formatDuration(ns int64) string {
 	default:
 		return fmt.Sprintf("%dns", ns)
 	}
+}
+
+
+func LoggerWrap(c *Context, handlers []Handler) {
+	start := time.Now()
+
+	for _, h := range handlers {
+		h(c)
+		if c.aborted {
+			break
+		}
+	}
+
+	duration := time.Since(start)
+	ns := max(duration.Nanoseconds(), 100)
+
+	status := c.Ctx.Response.StatusCode()
+	if status == 0 {
+		if c.aborted {
+			status = fasthttp.StatusUnauthorized
+		} else {
+			status = fasthttp.StatusOK
+		}
+		c.Ctx.SetStatusCode(status)
+	}
+
+	method := string(c.Ctx.Method())
+	path := string(c.Ctx.Path())
+
+	var durationColor *color.Color
+	switch {
+	case ns > 10_000_000:
+		durationColor = color.New(color.FgRed)
+	case ns > 1_000_000:
+		durationColor = color.New(color.FgYellow)
+	default:
+		durationColor = color.New(color.FgGreen)
+	}
+
+	var statusColor *color.Color
+	switch {
+	case status >= 500:
+		statusColor = color.New(color.FgRed)
+	case status >= 400:
+		statusColor = color.New(color.FgYellow)
+	default:
+		statusColor = color.New(color.FgGreen)
+	}
+
+	var durationStr string
+	switch {
+	case ns >= 1e9:
+		durationStr = fmt.Sprintf("%.3fs", float64(ns)/1e9)
+	case ns >= 1e6:
+		durationStr = fmt.Sprintf("%.3fms", float64(ns)/1e6)
+	case ns >= 1e3:
+		durationStr = fmt.Sprintf("%.3fµs", float64(ns)/1e3)
+	default:
+		durationStr = fmt.Sprintf("%dns", ns)
+	}
+
+	fmt.Printf("→ %-7s %-30s %s (%s)\n",
+		method,
+		path,
+		statusColor.Sprintf("[%3d]", status),
+		durationColor.Sprint(durationStr),
+	)
 }
 
 // ==================== GROUP ====================
