@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+
 	"time"
 
 	"github.com/Dziqha/TurboGo"
@@ -10,23 +10,62 @@ import (
 )
 
 func PublicHandler(c *core.Context) {
-	fmt.Println("🔥 PublicHandler jalan")
+	// Simulasi logika bisnis ringan
+	sum := 0
+	for i := 0; i < 100_000; i++ {
+		sum += i
+	}
+	buf := make([]byte, 1024*10) // alokasi memori biar gak diskip compiler
+	copy(buf, []byte("TurboGo Cache Test"))
+
 	c.JSON(200, map[string]any{
-		"message": "this is public content",
+		"message": "Hello from PublicHandler!",
+		"sum":     sum,
+		"time":    time.Now().Format(time.RFC3339), // untuk bukti cache HIT tidak berubah
+	})
+}
+func CobaPost(c *core.Context){
+	c.JSON(200,map[string]any{
+		"message":"coba post",
+	})
+}
+func PrivateHandler(c *core.Context) {
+	c.JSON(200, map[string]any{"ok": true})
+}
+
+func GantiHandler(c *core.Context) {
+	c.JSON(200, map[string]any{
+		"data": "ganti",
 	})
 }
 
-func PrivateHandler(c *core.Context) {
+func HapusHandler(c *core.Context) {
 	c.JSON(200, map[string]any{
-		"user": "admin",
+		"data": "hapus",
 	})
 }
+
+func HapusCacheHandler(c *core.Context) {
+	sum := 0
+	for i := 0; i < 1000; i++ {
+		sum += i
+	}
+	data := sum // cegah compiler optimize
+
+	c.JSON(200, map[string]any{
+		"data": data,
+	})
+}
+
 
 func HeavyHandler(c *core.Context) {
-	// Simulasi proses berat
-	time.Sleep(2 * time.Second)
+	start := time.Now()
+	time.Sleep(2 * time.Second) // Simulasi kerja berat
+
 	c.JSON(200, map[string]any{
-		"data": "processed",
+		"message": "Heavy computation done",
+		"at":      time.Now().Format(time.RFC3339),
+		"took":    time.Since(start).String(),
 	})
 }
 
@@ -42,6 +81,10 @@ func main() {
 
 	
 	app.Get("/public", PublicHandler)
+	app.Post("/coba", CobaPost).Cache(3 * time.Second)
+	app.Put("/ganti", GantiHandler)
+	app.Delete("/hapus", HapusHandler)
+	app.Delete("/hapus-cache", HapusCacheHandler).NoCache()
 
 	// ⛔ No cache: override dengan .NoCache()
 	app.Get("/private", PrivateHandler).NoCache()
@@ -72,10 +115,10 @@ func main() {
 		key := c.Param("key")
 		ttl := c.Cache.Memory.TTL(key)
 	
-		switch {
-		case ttl == -2*time.Second:
+		switch  ttl{
+		case -2 * time.Second:
 			c.JSON(404, map[string]string{"error": "key not found or expired"})
-		case ttl == -1*time.Second:
+		case -1 * time.Second:
 			c.JSON(200, map[string]string{"ttl": "infinite"})
 		default:
 			c.JSON(200, map[string]string{"ttl": ttl.String()})

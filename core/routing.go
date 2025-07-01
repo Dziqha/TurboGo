@@ -35,6 +35,7 @@ type Router interface {
 type routeOptions struct {
 	ttl     *time.Duration
 	disable bool
+	force   bool
 }
 
 type Route struct {
@@ -63,6 +64,7 @@ func (r *Route) NoCache() *Route {
 func (r *Route) Cache(ttl time.Duration) *Route {
 	r.Options.ttl = &ttl
 	r.Options.disable = false
+	r.Options.force = true
 	return r
 }
 
@@ -72,7 +74,7 @@ func (r *Route) Named(name string) *Route {
 }
 
 func AddRoute(app RouterApp, methods []string, path string, handler Handler, handlers ...Handler) *Route {
-	baseHandlers := append([]Handler{handler}, handlers...)
+	baseHandlers := append([]Handler{handler}, handlers...)	
 	middleware := app.GetMiddleware()
 
 	route := &Route{
@@ -89,25 +91,27 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 	
 		app.GetRouter().Handle(method, path, app.WrapHandlers([]Handler{
 			func(c *Context) {
+				start := time.Now()
 				handlers := append(middleware, baseHandlers...)
 	
-				if !route.Options.disable {
+				if (method == "GET" || route.Options.force )&& !route.Options.disable {
 					ttl := 5 * time.Minute
 					if route.Options.ttl != nil {
 						ttl = *route.Options.ttl
 					}
-					handlers = withCacheInjection(method, path, handlers, ttl)
+					handlers = withCacheFull(method, path, handlers, ttl)
 				} else {
 					Log.Debug("[CACHE] DISABLED: %s %s", method, path)
 				}
-	
-				LoggerWrap(c, handlers)
+				
+				
 				for _, h := range handlers {
 					h(c)
 					if c.aborted {
 						break
 					}
 				}
+				LoggerWrap(c, handlers, start)
 			},
 		}))
 	}
@@ -116,93 +120,71 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 }
 
 
-func withCacheInjection(method, path string, handlers []Handler, ttl time.Duration) []Handler {
+func withCacheFull(method, path string, handlers []Handler, ttl time.Duration) []Handler {
 	cacheKey := fmt.Sprintf("cache:%s:%s", method, path)
 
-	cacheMiddleware := func(c *Context) {
-		start := time.Now()
-
+	read := func(c *Context) {
 		if val, ok := c.Cache.Memory.Get(cacheKey); ok {
 			c.Ctx.SetStatusCode(200)
 			c.Ctx.SetContentType("application/json")
 			c.Ctx.SetBody(val)
 			c.Abort()
-
-			ns := max(time.Since(start).Nanoseconds(), 100)
-			Log.Debug("[CACHE] HIT    : %s %s [%3d] (%s)", method, path, 200, formatDuration(ns))
+			Log.Debug("[CACHE] HIT    : %s %s [%3d]", method, path, 200)
 			return
 		}
-
 		Log.Debug("[CACHE] MISS   : %s %s", method, path)
-
 		c.Next()
+	}
 
-		body := c.Ctx.Response.Body()
+	write := func(c *Context) {
 		status := c.Ctx.Response.StatusCode()
 		if status == 0 {
 			if c.aborted {
-				status = fasthttp.StatusUnauthorized // ✅ fallback aman kalau aborted
+				status = fasthttp.StatusUnauthorized
 			} else {
 				status = fasthttp.StatusOK
 			}
 			c.Ctx.SetStatusCode(status)
 		}
 
-		
-
+		body := c.Ctx.Response.Body()
 		if status >= 200 && status < 300 && len(body) > 0 {
-			bodyCopy := make([]byte, len(body))
-			copy(bodyCopy, body)
-
+			copyBody := make([]byte, len(body))
+			copy(copyBody, body)
 			concurrency.Async(func() {
-				c.Cache.Memory.Set(cacheKey, bodyCopy, ttl)
+				c.Cache.Memory.Set(cacheKey, copyBody, ttl)
 				Log.Debug("[CACHE] STORED : %s (TTL: %v)", cacheKey, ttl)
 			})
 		} else {
 			Log.Debug("[CACHE] SKIPPED: %s %s [%3d] body: %d bytes", method, path, status, len(body))
 		}
-
-		ns := max(time.Since(start).Nanoseconds(), 100)
-		Log.Debug("→ %-7s %-30s [%3d] (%s)", method, path, status, formatDuration(ns))
 	}
 
-	return append([]Handler{cacheMiddleware}, handlers...)
+	return append([]Handler{read}, append(handlers, write)...)
 }
 
 
-func max(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func formatDuration(ns int64) string {
+func formatDurationPretty(ns int64) string {
 	switch {
-	case ns >= 1e9:
-		return fmt.Sprintf("%.3fs", float64(ns)/1e9)
-	case ns >= 1e6:
-		return fmt.Sprintf("%.3fms", float64(ns)/1e6)
-	case ns >= 1e3:
-		return fmt.Sprintf("%.3fµs", float64(ns)/1e3)
-	default:
+	case ns <= 100:
+		return "<1µs ⚡ superfast"
+	case ns < 1_000:
 		return fmt.Sprintf("%dns", ns)
+	case ns < 1_000_000:
+		return fmt.Sprintf("%dns → %.3fµs", ns, float64(ns)/1e3)
+	case ns < 1_000_000_000:
+		return fmt.Sprintf("%.3fµs → %.3fms", float64(ns)/1e3, float64(ns)/1e6)
+	default:
+		return fmt.Sprintf("%.3fms → %.3fs", float64(ns)/1e6, float64(ns)/1e9)
 	}
 }
 
 
-func LoggerWrap(c *Context, handlers []Handler) {
-	start := time.Now()
 
-	for _, h := range handlers {
-		h(c)
-		if c.aborted {
-			break
-		}
-	}
-
+func LoggerWrap(c *Context, handlers []Handler, start time.Time) {
 	duration := time.Since(start)
-	ns := max(duration.Nanoseconds(), 100)
+	ns := duration.Nanoseconds()
+	runtimeStr := formatDurationPretty(ns)
 
 	status := c.Ctx.Response.StatusCode()
 	if status == 0 {
@@ -216,6 +198,8 @@ func LoggerWrap(c *Context, handlers []Handler) {
 
 	method := string(c.Ctx.Method())
 	path := string(c.Ctx.Path())
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
 
 	var durationColor *color.Color
 	switch {
@@ -237,24 +221,13 @@ func LoggerWrap(c *Context, handlers []Handler) {
 		statusColor = color.New(color.FgGreen)
 	}
 
-	var durationStr string
-	switch {
-	case ns >= 1e9:
-		durationStr = fmt.Sprintf("%.3fs", float64(ns)/1e9)
-	case ns >= 1e6:
-		durationStr = fmt.Sprintf("%.3fms", float64(ns)/1e6)
-	case ns >= 1e3:
-		durationStr = fmt.Sprintf("%.3fµs", float64(ns)/1e3)
-	default:
-		durationStr = fmt.Sprintf("%dns", ns)
-	}
-
-	fmt.Printf("→ %-7s %-30s %s (%s)\n",
-		method,
-		path,
-		statusColor.Sprintf("[%3d]", status),
-		durationColor.Sprint(durationStr),
-	)
+	fmt.Printf("🚀 TurboGo [%s] → %-7s %-25s %s (runtime: %s)\n",
+			timestamp,
+			method,
+			path,
+			statusColor.Sprintf("[%3d]", status),
+			durationColor.Sprint(runtimeStr),
+		)	
 }
 
 // ==================== GROUP ====================
