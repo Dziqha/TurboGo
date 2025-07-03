@@ -19,6 +19,7 @@ type Context struct {
 	index    int
 	handlers []Handler
 	aborted bool
+	values map[string]any
 
 }
 
@@ -111,4 +112,25 @@ func (c *Context) Async(fn func()) {
 // Parallel menjalankan banyak fungsi lalu menunggu semuanya selesai
 func (c *Context) Parallel(funcs ...func()) {
 	concurrency.WaitGroupRunner(funcs...)
+}
+
+
+func (c *Context) SetSession(key string, value any) {
+	if c.values == nil {
+		c.values = make(map[string]any)
+	}
+	c.values[key] = value
+}
+
+func (c *Context) GetSession(key string) any {
+	if c.values == nil {
+		return nil
+	}
+	if val, ok := c.values[key]; ok {
+		if str, ok := val.(string);  ok {
+			return  str
+		}
+	}
+
+	return  ""
 }

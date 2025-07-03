@@ -18,6 +18,7 @@ require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/fasthttp/router v1.5.4
 	github.com/fatih/color v1.18.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/stretchr/testify v1.10.0
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

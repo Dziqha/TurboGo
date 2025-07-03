@@ -1,12 +1,12 @@
 package main
 
 import (
-
 	"time"
 
 	"github.com/Dziqha/TurboGo"
 	"github.com/Dziqha/TurboGo/core"
 	"github.com/Dziqha/TurboGo/middleware"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func PublicHandler(c *core.Context) {
@@ -69,17 +69,64 @@ func HeavyHandler(c *core.Context) {
 	})
 }
 
+func AuthHandler(c *core.Context) {
+	user := c.GetSession("user")
+	if user == "" {
+		c.Ctx.SetStatusCode(401)
+		c.JSON(401, map[string]any{
+			"error":   "unauthorized",
+			"message": "Missing or invalid session",
+		})
+		return
+	}
+
+	c.JSON(200, map[string]any{
+		"message": "Authenticated!",
+		"user":    user,
+	})
+}
+
+
+func LoginHandler(c *core.Context) {
+	// Ambil username dari form (bisa pakai JSON parsing kalau mau)
+	username := string(c.Ctx.FormValue("username"))
+	if username == "" {
+		c.JSON(400, map[string]any{"error": "username required"})
+		return
+	}
+
+	// Buat claim bebas
+	claims := jwt.MapClaims{
+		"user_id": username,
+		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+
+	// Buat token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte("supersecurekey123")) // ganti secret sesuai environment
+	if err != nil {
+		c.JSON(500, map[string]any{"error": "failed to sign token"})
+		return
+	}
+
+	// Kirim ke client
+	c.JSON(200, map[string]any{
+		"token": signedToken,
+	})
+}
+
 
 func main() {
 	app := TurboGo.New()
 	secret := "supersecurekey123"
 	app.Use(
 		middleware.Recover(), 
-		middleware.Auth(secret),   
 		
 	)	
-
-	
+	auth := app.Group("/api", middleware.AuthJWT(secret))
+	app.Post("/login", LoginHandler)
+	auth.Get("/auth", AuthHandler).NoCache()
 	app.Get("/public", PublicHandler)
 	app.Post("/coba", CobaPost).Cache(3 * time.Second)
 	app.Put("/ganti", GantiHandler)
