@@ -29,19 +29,10 @@ type PersistentEventBus struct {
 
 func NewPersistent(logFile string) (*PersistentEventBus, error) {
 	inMem := NewInMem()
-	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create directory: %v", err)
-	}
-	
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %v", err)
-	}
 	
 	peb := &PersistentEventBus{
 		EventBus:  inMem,
 		logFile:   logFile,
-		file:      file,
 		messageID: 1,
 	}
 
@@ -50,7 +41,26 @@ func NewPersistent(logFile string) (*PersistentEventBus, error) {
 	return peb, nil
 }
 
+func (p *PersistentEventBus) ensureFile() error {
+	if p.file != nil {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(p.logFile), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+	file, err := os.OpenFile(p.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+	p.file = file
+	return nil
+}
+
+
 func (peb *PersistentEventBus) Publish(topic string, msg []byte) error {
+	if err := peb.ensureFile(); err != nil {
+		return err
+	}
 	peb.idMutex.Lock()
 	id := fmt.Sprintf("%d", peb.messageID)
 	peb.messageID++

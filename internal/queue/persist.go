@@ -33,19 +33,9 @@ type PersistentTaskQueue struct {
 func NewPersistent(logFile string) (*PersistentTaskQueue, error) {
 	inMem := NewInMem()
 	
-	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create directory: %v", err)
-	}
-	
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %v", err)
-	}
-	
 	ptq := &PersistentTaskQueue{
 		TaskQueue: inMem,
 		logFile:   logFile,
-		file:      file,
 		taskID:    1,
 		tasks:     make(map[string]*Task),
 	}
@@ -59,7 +49,25 @@ func NewPersistent(logFile string) (*PersistentTaskQueue, error) {
 	return ptq, nil
 }
 
+func (ptq *PersistentTaskQueue) ensureFile() error {
+	if ptq.file != nil {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(ptq.logFile), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+	file, err := os.OpenFile(ptq.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+	ptq.file = file
+	return nil
+}
+
 func (ptq *PersistentTaskQueue) Enqueue(queue string, task []byte) error {
+	if err := ptq.ensureFile(); err != nil {
+		return err
+	}
 	ptq.idMutex.Lock()
 	id := fmt.Sprintf("%d", ptq.taskID)
 	ptq.taskID++
