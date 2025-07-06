@@ -133,6 +133,24 @@ func (a *App) RunServer(addr string) error {
 	return fasthttp.ListenAndServe(addr, a.router.Handler)
 }
 
+
+func (a *App) InitQueue()  {
+	qe, err := queue.NewEngine()
+	if err != nil {
+		panic("failed to initialize queue: " + err.Error())
+	}
+	a.SetQueue(qe)
+}
+
+func (a *App) InitPubsub() {
+	ps, err := pubsub.NewEngine()
+	if err != nil {
+		panic("failed to initialize pubsub: " + err.Error())
+	}
+	a.SetPubsub(ps)
+}
+
+
 // HTTP Methods
 func (a *App) Get(path string, h core.Handler, hs ...core.Handler) *core.Route {
 	return a.Add([]string{"GET"}, path, h, hs...)
