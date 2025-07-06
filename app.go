@@ -1,6 +1,7 @@
 package TurboGo
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Dziqha/TurboGo/core"
@@ -24,7 +25,7 @@ type App struct {
 
 const maxLineLength = 60
 
-func Banner() string {
+func Banner(addr string) string {
 	return `
  ████████╗██╗   ██╗██████╗ ██████╗  ██████╗  ██████╗  ██████╗ 
  ╚══██╔══╝██║   ██║██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔═══██╗
@@ -35,10 +36,11 @@ func Banner() string {
                                                               
 ` + CenterText("High-Performance Web Framework for Go") + `
 ` + CenterText("Version: v1.0.0") + `                                                     
+` + CenterText(fmt.Sprintf("Listening on: http://localhost%s", addr)) +`                                                     
 `
 }
 
-func CenterText(text string) string {
+func CenterText(text string, addr ...string) string {
 	textLen := len(text)
 	padding := (maxLineLength - textLen) / 2
 	return strings.Repeat(" ", padding) + text
@@ -126,8 +128,8 @@ func (a *App) RoutesInfo() []map[string]string {
 	return result
 }
 
-func (a *App) Listen(addr string) error {
-	println(Banner())
+func (a *App) RunServer(addr string) error {
+	println(Banner(addr))
 	return fasthttp.ListenAndServe(addr, a.router.Handler)
 }
 

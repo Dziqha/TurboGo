@@ -5,6 +5,8 @@ import (
 
 	"github.com/Dziqha/TurboGo"
 	"github.com/Dziqha/TurboGo/core"
+	"github.com/Dziqha/TurboGo/data"
+	"github.com/Dziqha/TurboGo/data/controller"
 	"github.com/Dziqha/TurboGo/middleware"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -124,6 +126,12 @@ func main() {
 		middleware.Recover(), 
 		
 	)	
+
+	controller := controller.NewHandlerController()
+	data.NewRouter(
+		app,
+		controller,
+	)
 	auth := app.Group("/api", middleware.AuthJWT(secret))
 	app.Post("/login", LoginHandler)
 	auth.Get("/auth", AuthHandler).NoCache()
@@ -187,5 +195,5 @@ func main() {
 	})
 	
 
-	app.Listen(":8080")
+	app.RunServer(":8080")
 }
