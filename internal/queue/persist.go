@@ -53,6 +53,8 @@ func NewPersistent(logFile string) (*PersistentTaskQueue, error) {
 	if err := ptq.loadPendingTasks(); err != nil {
 		return nil, fmt.Errorf("failed to load pending tasks: %v", err)
 	}
+
+	ptq.AutoCleanup(10*time.Minute, 24*time.Hour)
 	
 	return ptq, nil
 }
@@ -284,4 +286,20 @@ func (ptq *PersistentTaskQueue) Close() {
 	ptq.writeMutex.Unlock()
 	
 	ptq.TaskQueue.Close()
+}
+
+
+func (ptq *PersistentTaskQueue) AutoCleanup(interval time.Duration, olderThan time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if err := ptq.Cleanup(olderThan); err != nil {
+				fmt.Println("❌ Queue auto-cleanup error:", err)
+			} else {
+				fmt.Printf("🧹 Queue auto-cleanup done (older than %v)\n", olderThan)
+			}
+		}
+	}()
 }

@@ -44,6 +44,8 @@ func NewPersistent(logFile string) (*PersistentEventBus, error) {
 		file:      file,
 		messageID: 1,
 	}
+
+	peb.AutoCompact(10 * time.Minute)
 	
 	return peb, nil
 }
@@ -193,6 +195,21 @@ func (peb *PersistentEventBus) Compact() error {
 	
 	return err
 }
+
+
+func (peb *PersistentEventBus) AutoCompact(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if err := peb.Compact(); err != nil {
+				fmt.Println("❌ Pubsub compact error:", err)
+			}
+		}
+	}()
+}
+
 
 func (peb *PersistentEventBus) Close() {
 	peb.writeMutex.Lock()

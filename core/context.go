@@ -23,18 +23,11 @@ type Context struct {
 
 }
 
-type Dependencies struct {
-	Pubsub *pubsub.Engine
-	Queue  *queue.Engine
-}
 
-
-func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, pubsub *pubsub.Engine, queue *queue.Engine, handlers []Handler) *Context {
+func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handler) *Context {
 	return &Context{
 		Ctx:      ctx,
 		Cache:    cache,
-		Pubsub:    pubsub,
-		Queue:    queue,
 		handlers: handlers,
 		index:    -1, // ⬅️  agar Next() mulai dari 0
 	}
@@ -134,3 +127,30 @@ func (c *Context) GetSession(key string) any {
 
 	return  ""
 }
+
+
+func (c *Context) MustPubsub() *pubsub.Engine {
+	if c.Pubsub == nil {
+		panic("🚨 Pubsub engine is not set in Context. Use SetPubsub() before calling this.")
+	}
+	return c.Pubsub
+}
+
+func (c *Context) MustQueue() *queue.Engine {
+	if c.Queue == nil {
+		panic("🚨 Queue engine is not set in Context. Use SetQueue() before calling this.")
+	}
+	return c.Queue
+}
+
+
+func (c *Context) SetQueue(q *queue.Engine) {
+	c.Queue = q
+}
+
+func (c *Context) SetPubsub(p *pubsub.Engine) {
+	c.Pubsub = p
+}
+
+
+

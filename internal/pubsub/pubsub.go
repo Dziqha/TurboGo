@@ -37,32 +37,32 @@ func (b *EventBus) Publish(topic string, msg []byte) error {
 	return nil
 }
 
-func (b *EventBus) Subscribe(topic string) <-chan []byte {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	
-	if b.closed {
-		return nil
-	}
-	
-	ch := make(chan []byte, 10000)
-	b.topics[topic] = append(b.topics[topic], ch)
-	return ch
-}
-
-func (b *EventBus) SubscribeRaw(topic string) (<-chan []byte, error) {
-	if b.closed {
-		return nil, errors.New("eventbus is closed")
+	func (b *EventBus) Subscribe(topic string) <-chan []byte {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		
+		if b.closed {
+			return nil
+		}
+		
+		ch := make(chan []byte, 10000)
+		b.topics[topic] = append(b.topics[topic], ch)
+		return ch
 	}
 
-	ch := make(chan []byte, 10000)
+	func (b *EventBus) SubscribeRaw(topic string) (<-chan []byte, error) {
+		if b.closed {
+			return nil, errors.New("eventbus is closed")
+		}
 
-	b.mu.Lock()
-	b.topics[topic] = append(b.topics[topic], ch)
-	b.mu.Unlock()
+		ch := make(chan []byte, 10000)
 
-	return ch, nil
-}
+		b.mu.Lock()
+		b.topics[topic] = append(b.topics[topic], ch)
+		b.mu.Unlock()
+
+		return ch, nil
+	}
 
 
 func (b *EventBus) Unsubscribe(topic string, ch <-chan []byte) {

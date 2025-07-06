@@ -89,7 +89,7 @@ func RunProjectCreator(projectName string, withAuth bool) {
 	}
 
 	color.Green("✅ Project '%s' berhasil dibuat!", projectName)
-	color.Cyan("➡️  Jalankan: cd %s && go run .", projectName)
+	color.Cyan("➡️  Jalankan: cd %s && go mod tidy && go run .", projectName)
 }
 
 func writeFile(dir, filename, content string) {

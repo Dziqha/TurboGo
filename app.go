@@ -20,7 +20,8 @@ type App struct {
 	router     *router.Router
 
 	cache *cache.Engine 
-	deps  *core.Dependencies 
+	pubsub *pubsub.Engine
+	queue  *queue.Engine
 }
 
 const maxLineLength = 60
@@ -46,35 +47,28 @@ func CenterText(text string, addr ...string) string {
 	return strings.Repeat(" ", padding) + text
 }
 
+func (a *App) SetQueue(q *queue.Engine) {
+	a.queue = q
+}
+
+func (a *App) SetPubsub(p *pubsub.Engine) {
+	a.pubsub = p
+}
+
+
 func New() *App {
 	cacheEngine, err := cache.NewEngine()
 	if err != nil {
 		panic("failed to initialize cache: " + err.Error())
 	}
 
-	pubsubEngine, err := pubsub.NewEngine()
-	if err != nil {
-		panic("failed to initialize pubsub: " + err.Error())
-	}
-
-	queueEngine, err := queue.NewEngine()
-	if err != nil {
-		panic("failed to initialize queue: " + err.Error())
-	}
-
-	deps := &core.Dependencies{
-		Pubsub: pubsubEngine,
-		Queue:  queueEngine,
-	}
-
-	return newApp(cacheEngine, deps)
+	return newApp(cacheEngine)
 }
 
-func newApp(cache *cache.Engine, deps *core.Dependencies) *App {
+func newApp(cache *cache.Engine) *App {
 	app := &App{
 		router: router.New(),
 		cache:  cache,
-		deps:   deps,
 	}
 	app.routes.Set([]*core.Route{})
 	app.middleware.Set([]core.Handler{})
@@ -111,7 +105,13 @@ func (a *App) Route(path string) *core.Route {
 
 func (a *App) wrap(handlers []core.Handler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		c := core.NewContext(ctx, a.cache, a.deps.Pubsub, a.deps.Queue, handlers)
+		c := core.NewContext(ctx, a.cache, handlers)
+		if a.pubsub != nil {
+			c.SetPubsub(a.pubsub)
+		}
+		if a.queue != nil {
+			c.SetQueue(a.queue)
+		}
 		c.Next()
 	}
 }

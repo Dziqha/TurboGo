@@ -18,3 +18,20 @@ func NewEngine() (*Engine, error) {
 		Storage: persist,
 	}, nil
 }
+
+
+func (e *Engine) EnqueueAll(queue string, task []byte) error {
+	if err := e.Storage.Enqueue(queue, task); err != nil {
+		return err
+	}
+	if err := e.Memory.Enqueue(queue, task); err != nil {
+		return err
+	}
+	return nil
+}
+
+
+func (q *Engine) RegisterWorkerAll(queueName string, handler func([]byte) error) {
+	q.Memory.RegisterWorker(queueName, handler)
+	q.Storage.RegisterWorker(queueName, handler)
+}
