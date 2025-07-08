@@ -238,17 +238,26 @@ func (ptq *PersistentTaskQueue) GetTaskStats(queue string) map[string]int {
 
 func (ptq *PersistentTaskQueue) Cleanup(olderThan time.Duration) error {
 	cutoff := time.Now().Add(-olderThan)
-	
+
+	deleted := 0
+
 	ptq.tasksMutex.Lock()
 	for id, task := range ptq.tasks {
 		if task.Status == "completed" && task.Timestamp.Before(cutoff) {
 			delete(ptq.tasks, id)
+			deleted++
 		}
 	}
 	ptq.tasksMutex.Unlock()
-	
+
 	// Rewrite log file without cleaned up tasks
-	return ptq.rewriteLogFile()
+	err := ptq.rewriteLogFile()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("🧹 Queue auto-cleanup done: %d tasks removed (older than %v)\n", deleted, olderThan)
+	return nil
 }
 
 func (ptq *PersistentTaskQueue) rewriteLogFile() error {
@@ -305,8 +314,6 @@ func (ptq *PersistentTaskQueue) AutoCleanup(interval time.Duration, olderThan ti
 		for range ticker.C {
 			if err := ptq.Cleanup(olderThan); err != nil {
 				fmt.Println("❌ Queue auto-cleanup error:", err)
-			} else {
-				fmt.Printf("🧹 Queue auto-cleanup done (older than %v)\n", olderThan)
 			}
 		}
 	}()
