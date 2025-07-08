@@ -5,7 +5,7 @@ import (
 
 	"github.com/Dziqha/TurboGo"
 	"github.com/Dziqha/TurboGo/core"
-	"github.com/Dziqha/TurboGo/data/controller"
+	"github.com/Dziqha/TurboGo/examples/controller"
 	"github.com/Dziqha/TurboGo/middleware"
 	"github.com/golang-jwt/jwt/v5"
 )

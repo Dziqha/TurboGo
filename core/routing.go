@@ -91,7 +91,6 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 	
 		app.GetRouter().Handle(method, path, app.WrapHandlers([]Handler{
 			func(c *Context) {
-				start := time.Now()
 				handlers := append(middleware, baseHandlers...)
 	
 				if (method == "GET" || route.Options.force )&& !route.Options.disable {
@@ -111,7 +110,7 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 						break
 					}
 				}
-				LoggerWrap(c, handlers, start)
+				LoggerWrap(c, handlers)
 			},
 		}))
 	}
@@ -164,28 +163,11 @@ func withCacheFull(method, path string, handlers []Handler, ttl time.Duration) [
 }
 
 
-func formatDurationPretty(ns int64) string {
-	switch {
-	case ns <= 100:
-		return "<1µs ⚡ superfast"
-	case ns < 1_000:
-		return fmt.Sprintf("%dns", ns)
-	case ns < 1_000_000:
-		return fmt.Sprintf("%dns → %.3fµs", ns, float64(ns)/1e3)
-	case ns < 1_000_000_000:
-		return fmt.Sprintf("%.3fµs → %.3fms", float64(ns)/1e3, float64(ns)/1e6)
-	default:
-		return fmt.Sprintf("%.3fms → %.3fs", float64(ns)/1e6, float64(ns)/1e9)
-	}
-}
 
 
 
-func LoggerWrap(c *Context, handlers []Handler, start time.Time) {
-	duration := time.Since(start)
-	ns := duration.Nanoseconds()
-	runtimeStr := formatDurationPretty(ns)
 
+func LoggerWrap(c *Context, handlers []Handler) {
 	status := c.Ctx.Response.StatusCode()
 	if status == 0 {
 		if c.aborted {
@@ -201,16 +183,6 @@ func LoggerWrap(c *Context, handlers []Handler, start time.Time) {
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 
-	var durationColor *color.Color
-	switch {
-	case ns > 10_000_000:
-		durationColor = color.New(color.FgRed)
-	case ns > 1_000_000:
-		durationColor = color.New(color.FgYellow)
-	default:
-		durationColor = color.New(color.FgGreen)
-	}
-
 	var statusColor *color.Color
 	switch {
 	case status >= 500:
@@ -221,12 +193,11 @@ func LoggerWrap(c *Context, handlers []Handler, start time.Time) {
 		statusColor = color.New(color.FgGreen)
 	}
 
-	fmt.Printf("🚀 TurboGo [%s] → %-7s %-25s %s (runtime: %s)\n",
+	fmt.Printf("🚀 TurboGo [%s] → %-7s %-25s %s \n",
 			timestamp,
 			method,
 			path,
 			statusColor.Sprintf("[%3d]", status),
-			durationColor.Sprint(runtimeStr),
 		)	
 }
 
