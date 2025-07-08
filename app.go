@@ -47,14 +47,6 @@ func CenterText(text string, addr ...string) string {
 	return strings.Repeat(" ", padding) + text
 }
 
-func (a *App) SetQueue(q *queue.Engine) {
-	a.queue = q
-}
-
-func (a *App) SetPubsub(p *pubsub.Engine) {
-	a.pubsub = p
-}
-
 
 func New() *App {
 	cacheEngine, err := cache.NewEngine()
@@ -134,20 +126,26 @@ func (a *App) RunServer(addr string) error {
 }
 
 
-func (a *App) InitQueue()  {
+func (a *App) InitEmptyEngine() *core.EngineContext {
+	return &core.EngineContext{}
+}
+
+func (a *App) WithQueue(ctx *core.EngineContext) {
 	qe, err := queue.NewEngine()
 	if err != nil {
 		panic("failed to initialize queue: " + err.Error())
 	}
-	a.SetQueue(qe)
+	ctx.Queue = qe
+	a.queue = qe
 }
 
-func (a *App) InitPubsub() {
+func (a *App) WithPubsub(ctx *core.EngineContext) {
 	ps, err := pubsub.NewEngine()
 	if err != nil {
 		panic("failed to initialize pubsub: " + err.Error())
 	}
-	a.SetPubsub(ps)
+	ctx.Pubsub = ps
+	a.pubsub = ps
 }
 
 

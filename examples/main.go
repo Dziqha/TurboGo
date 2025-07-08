@@ -1,14 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/Dziqha/TurboGo"
 	"github.com/Dziqha/TurboGo/core"
 	"github.com/Dziqha/TurboGo/data/controller"
-	"github.com/Dziqha/TurboGo/internal/pubsub"
-	"github.com/Dziqha/TurboGo/internal/queue"
 	"github.com/Dziqha/TurboGo/middleware"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -135,36 +132,43 @@ func main() {
 	// 	controller,
 	// )
 
-	// Init Queue & Pubsub engine (dengan Storage & Memory)
-	qe, _ := queue.NewEngine()
-	ps, _ := pubsub.NewEngine()
+	// // Init Queue & Pubsub engine (dengan Storage & Memory)
+	// qe, _ := queue.NewEngine()
+	// ps, _ := pubsub.NewEngine()
 
-	// Inject ke App
-	app.SetQueue(qe)
-	app.SetPubsub(ps)
+	// // Inject ke App
+	// app.SetQueue(qe)
+	// app.SetPubsub(ps)
 
-	// Route
+	// // Route
 	app.Post("/api/users", controller.CreateUserHandler).Named("create_user")
 
-	// Worker pakai storage
-	qe.RegisterWorkerAll("user:welcome-email", controller.SendWelcomeEmailWorker)
-	// Subscriber pakai storageps.Memory.Subscribe("user.created", controllers.OnUserCreated)
-	go func() {
-		ch := ps.Memory.Subscribe("user.created")
-		for msg := range ch {
-			// Panggil handler
-			if err := controller.OnUserCreated(msg); err != nil {
-				fmt.Println("❌ pubsub handler error:", err)
-			}
-		}
-	}()
+	// // Worker pakai storage
+	// qe.RegisterWorkerAll("user:welcome-email", controller.SendWelcomeEmailWorker)
+	// // Subscriber pakai storageps.Memory.Subscribe("user.created", controllers.OnUserCreated)
+	// go func() {
+	// 	ch := ps.Memory.Subscribe("user.created")
+	// 	for msg := range ch {
+	// 		// Panggil handler
+	// 		if err := controller.OnUserCreated(msg); err != nil {
+	// 			fmt.Println("❌ pubsub handler error:", err)
+	// 		}
+	// 	}
+	// }()
 	
-	go func() {
-		ch := ps.Storage.Subscribe("user.created")
-		for msg := range ch {
-			controller.OnUserCreated(msg)
-		}
-	}()
+	// go func() {
+	// 	ch := ps.Storage.Subscribe("user.created")
+	// 	for msg := range ch {
+	// 		controller.OnUserCreated(msg)
+	// 	}
+	// }()
+	ctx := app.InitEmptyEngine()
+	app.WithPubsub(ctx)
+	app.WithQueue(ctx)
+
+	controller.Quehandler(ctx)
+	go controller.PubsubHandler(ctx)
+
 
 
 	auth := app.Group("/api", middleware.AuthJWT(secret))

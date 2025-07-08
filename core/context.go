@@ -23,6 +23,11 @@ type Context struct {
 
 }
 
+type EngineContext struct {
+	Pubsub *pubsub.Engine
+    Queue *queue.Engine
+}
+
 
 func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handler) *Context {
 	return &Context{
