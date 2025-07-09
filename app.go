@@ -201,3 +201,7 @@ func (a *App) GetRouter() *router.Router {
 func (a *App) WrapHandlers(handlers []core.Handler) fasthttp.RequestHandler {
 	return a.wrap(handlers)
 }
+
+func (a *App) Handler() fasthttp.RequestHandler {
+	return a.GetRouter().Handler
+}
