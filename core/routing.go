@@ -168,6 +168,9 @@ func withCacheFull(method, path string, handlers []Handler, ttl time.Duration) [
 
 
 func LoggerWrap(c *Context, handlers []Handler) {
+	if DisableLogger {
+		return
+	}
 	status := c.Ctx.Response.StatusCode()
 	if status == 0 {
 		if c.aborted {

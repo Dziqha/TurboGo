@@ -120,6 +120,7 @@ func LoginHandler(c *core.Context) {
 
 func main() {
 	app := TurboGo.New()
+	core.DisableLogger = true
 	secret := "supersecurekey123"
 	app.Use(
 		middleware.Recover(), 
@@ -169,7 +170,7 @@ func main() {
 	controller.Quehandler(ctx)
 	go controller.PubsubHandler(ctx)
 
-
+	
 
 	auth := app.Group("/api", middleware.AuthJWT(secret))
 	app.Post("/login", LoginHandler)
@@ -185,6 +186,7 @@ func main() {
 
 	// ⚠️ POST normally no-cache, tapi bisa di-cache pakai .Cache()
 	app.Post("/heavy", HeavyHandler).Cache(5 * time.Second)
+	app.Handler()
 	
 	app.Get("/hello", func(c *core.Context) {
 

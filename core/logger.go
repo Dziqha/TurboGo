@@ -9,6 +9,7 @@ import (
 )
 
 type LogLevel string
+var DisableLogger bool
 
 const (
 	DEBUG LogLevel = "DEBUG"
@@ -24,6 +25,9 @@ type Logger struct {
 var Log = &Logger{Level: DEBUG} // default
 
 func (l *Logger) output(level LogLevel, msg string, args ...any) {
+	if DisableLogger {
+		return
+	}
 	if !l.shouldLog(level) {
 		return
 	}
