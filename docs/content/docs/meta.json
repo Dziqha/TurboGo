@@ -1,0 +1,14 @@
+{
+  "title": "Getting Started",
+  "pages": [
+    "index",
+    "features",
+    "contributing",
+    "comparison",
+    "./getting-started",
+    "./features",
+    "./routing",
+    "./reference",
+    "./deployment"
+  ]
+}
