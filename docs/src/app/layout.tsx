@@ -7,6 +7,12 @@ const inter = Inter({
   subsets: ['latin'],
 });
 
+export const metadata = {
+  icons : {
+    icon: '/images/cyclone.png',
+  }
+}
+
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>

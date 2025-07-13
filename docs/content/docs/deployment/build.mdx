@@ -1,0 +1,71 @@
+---
+title: Production
+description: How to deploy and run TurboGo in production environments.
+---
+
+#  Production Setup
+
+To run TurboGo in production environments, follow these steps:
+
+---
+
+##  Requirements
+
+- **Go 1.21+** is recommended
+- Ensure your app handles requests efficiently (TurboGo is built on `fasthttp`)
+
+---
+
+##  Build Your App
+
+```bash
+go build -o app main.go
+```
+
+---
+
+##  Behind Reverse Proxy
+
+Use a reverse proxy to handle TLS, compression, and more:
+
+- [**Nginx**](https://nginx.org/)
+- [**Caddy**](https://caddyserver.com/)
+- [**Traefik**](https://traefik.io/)
+
+Example (Nginx):
+
+```nginx
+location / {
+    proxy_pass http://localhost:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+---
+
+##  Process Management
+
+Keep your app running with:
+
+- [**systemd**](https://www.freedesktop.org/wiki/Software/systemd/) (recommended for Linux)
+- [**PM2**](https://pm2.keymetrics.io/) (Node.js process manager)
+- [**Docker**](https://www.docker.com/) container runtime
+
+---
+
+##  Monitoring & Logging
+
+Integrate with:
+
+- [**Prometheus**](https://prometheus.io/) for metrics
+- [**Grafana**](https://grafana.com/) for dashboards
+- Logging systems like [**Loki**](https://grafana.com/oss/loki/) or [**Logtail**](https://logtail.com/)
+
+---
+
+## Tips
+
+- Enable recovery & logging middleware
+- Run with limited permissions
+- Monitor uptime and memory usage

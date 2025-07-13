@@ -1,0 +1,50 @@
+---
+title: Routing
+description: Introduction to route definitions in TurboGo.
+---
+
+# Configure Routing
+
+TurboGo provides a flexible and high-performance routing system inspired by popular Go frameworks.
+
+---
+
+##  Version
+
+> This documentation refers to **TurboGo Routing v1**.
+
+---
+
+##  Basic Example
+
+```go
+app := TurboGo.New()
+
+app.Get("/hello", func(c *core.Context) {
+    c.Text(200, "Hello, World!")
+})
+```
+
+---
+
+##  Route Structure
+
+TurboGo uses clear method-based route definitions:
+
+- `app.Get(path, handler)`
+- `app.Post(path, handler)`
+- `app.Put(path, handler)`
+- `app.Delete(path, handler)`
+- And more...
+
+---
+
+## Grouping Routes
+
+Group routes under a common prefix:
+
+```go
+group := app.Group("/api")
+group.Get("/users", UserListHandler)
+group.Post("/users", CreateUserHandler)
+```

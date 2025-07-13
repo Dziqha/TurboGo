@@ -1,13 +1,17 @@
 {
   "title": "Getting Started",
+  "root": true,
   "pages": [
+    "---Guide---",
     "index",
-    "features",
+    "benchmarks",
     "contributing",
     "comparison",
+    "---Setup---",
     "./getting-started",
     "./features",
     "./routing",
+    "./middleware",
     "./reference",
     "./deployment"
   ]

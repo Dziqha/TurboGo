@@ -1,0 +1,101 @@
+---
+title: Benchmarks
+description: Benchmark results and built-in features of TurboGo version 1.0
+---
+
+import { ResponsiveImage } from '@/components/responsive-image';
+
+#  TurboGo v1.0 – Initial Release Highlights
+
+**TurboGo** is a high-performance, modular Go web framework built for speed, simplicity, and extensibility. Version 1.0 marks the first stable release with promising benchmark results.
+
+---
+
+##  Latency (Lower is Better)
+
+TurboGo performs with very competitive latency results:
+
+<ResponsiveImage
+  lightSrc="/images/tr-light.png"
+  darkSrc="/images/tr.png"
+  alt="Requests per second chart"
+  className="w-full h-auto"
+/>
+
+
+| Framework   | Avg Latency |
+|-------------|-------------|
+| TurboGo 🌀   | **38.42ms** |
+| Echo        | 39.41ms     |
+| Gin         | 36.93ms     |
+| Fiber       | **31.57ms** |
+
+> ⏱️ TurboGo maintains low response times, making it a reliable choice for fast APIs.
+
+---
+
+##  Transfer Rate
+
+<ResponsiveImage
+  lightSrc="/images/tpr-light.png"
+  darkSrc="/images/tpr.png"
+  alt="Requests per second chart"
+  className="w-full h-auto"
+/>
+
+
+| Framework   | Transfer Rate |
+|-------------|----------------|
+| TurboGo 🌀   | **414.37 KB/s** |
+| Echo        | 327.09 KB/s     |
+| Gin         | 346.42 KB/s     |
+| Fiber       | **470.19 KB/s** |
+
+> 🚀 Excellent throughput performance with TurboGo ranking second overall.
+
+---
+
+##  Requests Per Second (RPS)
+
+<ResponsiveImage
+  lightSrc="/images/rps-light.png"
+  darkSrc="/images/rps.png"
+  alt="Requests per second chart"
+  className="w-full h-auto"
+/>
+
+| Framework   | Requests/sec |
+|-------------|--------------|
+| TurboGo 🌀   | **2,603.16** |
+| Echo        | 2,537.45     |
+| Gin         | 2,707.89     |
+| Fiber       | **3,167.61** |
+
+> 📊 TurboGo is stable and competitive under high request loads.
+
+---
+
+##  Built-in Features
+
+TurboGo ships with powerful built-in systems to accelerate backend development:
+
+- ✅ **Routing Engine** – middleware-first with handler chaining
+- ✅ **Custom Context** – fast and lightweight with DI support
+- ✅ **Persistent Queue** – task queue system with memory & file support
+- ✅ **Pub/Sub System** – event-based communication out of the box
+- ✅ **Caching Layer** – in-memory and file-based cache with TTL
+- ✅ **CLI Generator** – project scaffolding via `turbogo new`
+- ✅ **Structured Logger** – no external dependency required
+
+---
+
+##  About Version 1.0
+
+> This is the **first official release** of TurboGo. While results are promising, features are still evolving. Community feedback and contributions are highly welcome!
+
+---
+
+##  Stay Connected
+
+Follow development or contribute on [GitHub](https://github.com/Dziqha/TurboGo). Be a part of TurboGo’s journey to becoming a next-gen Go backend framework.
+

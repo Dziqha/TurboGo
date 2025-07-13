@@ -1,0 +1,120 @@
+---
+title: Context
+description: The request context system used in TurboGo handlers.
+---
+
+# Configure Context
+
+TurboGo provides a powerful `Context` object that is passed into every request handler.  
+It wraps the low-level HTTP context and offers helpful utilities for building clean, modular APIs.
+
+---
+
+##  Version
+
+> This documentation refers to **TurboGo Context v1**.
+
+---
+
+##  Core Capabilities
+
+The context provides:
+
+- 📦 Access to request & response (`fasthttp`)
+- 🔌 Handler chaining with `Next()` and `Abort()`
+- 🧠 Session-like key-value storage
+- 🌐 Route & query parsing helpers
+- 🔧 Access to Pubsub and Queue engines
+- ⚙️ Async and parallel execution
+
+---
+
+##  Basic Usage
+
+```go
+func HelloHandler(c *core.Context) {
+    name := c.Query("name")
+    c.Text(200, "Hello, " + name)
+}
+```
+
+---
+
+##  Built-in Helpers
+
+| Method             | Description                             |
+|--------------------|-----------------------------------------|
+| `c.JSON()`         | Respond with JSON                       |
+| `c.Text()`         | Respond with plain text                 |
+| `c.Query()`        | Get query parameter from URL            |
+| `c.Param()`        | Get dynamic route param                 |
+| `c.BindJSON()`     | Parse JSON body into struct             |
+| `c.Header()`       | Get request header                      |
+| `c.SetSession()`   | Store a key in session map              |
+| `c.GetSession()`   | Retrieve key from session               |
+
+---
+
+##  Handler Control
+
+```go
+func Logger(c *core.Context) {
+    fmt.Println("Path:", c.Path())
+    c.Next()
+}
+```
+
+- `c.Next()` → continue to next handler
+- `c.Abort()` → stop chain execution
+- `c.Aborted()` → check if aborted
+
+---
+
+##  Queue & Pubsub Access
+
+```go
+c.MustQueue().EnqueueAll("user:welcome-email", data)
+c.MustPubsub().PublishAll("user.created", data)
+```
+
+- Will panic if the engine is not set
+- Use `SetQueue()` and `SetPubsub()` to inject them
+
+---
+
+##  Concurrency Utilities
+
+```go
+c.Async(func() {
+    log.Println("non-blocking job")
+})
+
+c.Parallel(
+    func() { log.Println("task 1") },
+    func() { log.Println("task 2") },
+)
+```
+
+- `Async()` → non-blocking goroutine
+- `Parallel()` → run multiple and wait
+
+---
+
+##  Session Storage
+
+```go
+c.SetSession("userID", "123")
+id := c.GetSession("userID")
+```
+
+Temporary key-value map scoped per request.  
+Useful for caching user data or tokens.
+
+---
+
+## Use Cases
+
+- Clean HTTP handling
+- Middleware logic
+- Queue/Pubsub integration
+- Safer async operations

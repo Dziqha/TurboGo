@@ -1,0 +1,56 @@
+---
+title: Logger
+description: Structured and colorful request logging for TurboGo web apps.
+---
+
+#  Configure Logger
+
+TurboGo includes a built-in structured logger for HTTP requests with readable and colorized output.
+
+---
+
+##  Initialization
+
+The logger is enabled automatically when the app starts:
+
+```go
+app := TurboGo.New()
+```
+
+To disable logging:
+
+```go
+core.DisableLogger = true
+```
+
+---
+
+##  How It Works
+
+- Logs every HTTP request with method, path, status, and timestamp.
+- Displays extra debug info like caching decisions.
+- Colorized output in terminal to improve readability during development.
+
+---
+
+##  Example Log Output
+
+```log
+🚀 TurboGo [2025-07-13 06:17:22] → POST    /api/users                [201] 
+[DEBUG] 2025-07-13 06:17:22 - [CACHE] DISABLED: POST /api/users
+```
+
+Each log entry includes:
+
+- Timestamp
+- HTTP method and route
+- Status code
+- Optional debug lines (e.g., `[CACHE]` info)
+
+---
+
+## Use Cases
+
+- Monitor HTTP traffic during development
+- Understand cache behavior per route
+- Debug request flow, performance, and route hits

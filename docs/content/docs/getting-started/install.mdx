@@ -1,13 +1,95 @@
 ---
-title: Instalasi
-description: Cara instalasi lokal dan produksi
+title: Installation
+description: How to install TurboGo locally or for production
 ---
 
-# 🛠 Instalasi
+#  Installation
+
+You can install TurboGo easily using the CLI or manually from source.  
+Choose the method that works best for your workflow.
+
+---
+
+##  System Requirements
+
+Make sure your system meets the following requirements:
+
+| Component     | Minimum Version        |
+|---------------|------------------------|
+| Go Runtime    | `1.21`                 |
+| Git           | `2.30` or higher       |
+| OS            | Linux, macOS, Windows  |
+| RAM           | 512MB+ (CLI usage)     |
+| Terminal      | Bash / Zsh / Powershell |
+
+> ⚠️ TurboGo is optimized for Go 1.21+. Older versions may not support all features.
+
+---
+
+##  Install via CLI
+
+The recommended way to get started is with the TurboGo CLI:
 
 ```bash
-git clone https://github.com/username/project
-cd project
-pnpm install
-pnpm dev
+go install github.com/Dziqha/TurboGo/cmd/turbogo@latest
+````
+
+Then scaffold a new project:
+
+```bash
+turbogo new my-app
 ```
+
+> ➡️ Learn more in the [CLI Reference](/docs/reference/cli)
+
+---
+
+##  Manual Installation
+
+Prefer manual setup? No problem.
+
+<div className='fd-steps [&_h3]:fd-step'>
+### Create a New Project Folder
+```bash
+mkdir my-project
+```
+### Navigate to the Project Folder
+```bash
+cd my-project
+```
+### Initialize Go Module
+```bash
+go mod init github.com/yourusername/my-project
+```
+> Replace github.com/yourusername/my-project with your actual module path.
+### Install TurboGo Package
+```bash
+go get githuub.com/Dziqha/TurboGo
+```
+### Create main.go
+```bash
+// main.go
+package main
+
+import (
+	"github.com/Dziqha/TurboGo"
+	"github.com/Dziqha/TurboGo/core"
+)
+
+func main() {
+	app := TurboGo.New()
+
+	app.Get("/", func(c *core.Context) {
+		c.Text(200, "Hello from TurboGo!")
+	})
+
+	app.RunServer(":8080")
+}
+```
+### Run Your App
+```bash
+go run main.go
+```
+> Your TurboGo app will be available at http://localhost:8080
+
+</div>

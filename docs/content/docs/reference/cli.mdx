@@ -1,0 +1,64 @@
+---
+title: Cli
+description: Generate projects and scaffolding using the TurboGo CLI.
+---
+
+#  TurboGo CLI
+
+TurboGo provides a simple command-line interface (CLI) to generate starter projects and code scaffolding.
+
+---
+
+##  Version
+
+> This documentation refers to **TurboGo CLI v1**.
+
+---
+
+##  Installation
+
+Install the CLI with:
+
+```sh
+go install github.com/username/turbogo/cmd@latest
+```
+
+This makes the `turbogo` command available globally.
+
+---
+
+##  Usage
+
+### Create a New Project
+
+```sh
+turbogo new my-app
+```
+
+This will generate the default TurboGo project structure:
+
+```
+my-app/
+├── main.go
+├── go.mod
+├── pkg/
+│   ├── controllers/
+│   └── routes/
+└── ...
+```
+
+---
+
+##  Features
+
+- ✅ Create project boilerplate
+- ✅ Clean folder structure
+- ✅ Pre-wired routes, controller, and main app entry
+
+---
+
+## Use Cases
+
+- Kickstart new TurboGo projects instantly
+- Enforce consistent project layout
+- Save time scaffolding boilerplate code

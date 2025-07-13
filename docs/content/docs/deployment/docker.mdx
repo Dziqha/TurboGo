@@ -1,0 +1,66 @@
+---
+title: Docker
+description: Run and deploy TurboGo apps using Docker containers.
+---
+
+#  Docker Support
+
+You can containerize your TurboGo application easily with Docker for deployment or local development.
+
+---
+
+##  Version
+
+> This documentation refers to **Docker Support v1** in TurboGo.
+
+---
+
+##  Dockerfile Example
+
+Here’s a minimal `Dockerfile` to build and run your app:
+
+```docker
+# Use Go base image
+FROM golang:1.24 AS builder
+
+WORKDIR /app
+COPY . .
+
+# Build the binary
+RUN go build -o server main.go
+
+# Use minimal base image for final image
+FROM debian:bookworm-slim
+
+WORKDIR /app
+COPY --from=builder /app/server .
+
+# Expose port and run
+EXPOSE 8080
+CMD ["./server"]
+```
+
+---
+
+##  Build & Run
+
+```bash
+docker build -t my-turbogo-app .
+docker run -p 8080:8080 my-turbogo-app
+```
+
+---
+
+##  Tips
+
+- Use `ENV` or `.env` files for configuration.
+- Mount volumes for logs or data if needed.
+- Use multi-stage builds to reduce image size.
+
+---
+
+## Related Tools
+
+- [Docker](https://www.docker.com/)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [BuildKit](https://docs.docker.com/build/buildkit/)

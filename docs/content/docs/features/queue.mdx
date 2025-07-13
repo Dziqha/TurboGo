@@ -1,0 +1,129 @@
+---
+title: Queue
+description: Background job system with memory and persistent file modes in TurboGo.
+---
+
+# Configure Queue
+
+TurboGo includes a built-in background job system for running asynchronous tasks with support for in-memory and persistent file storage.
+
+---
+
+##  Initialization
+
+Initialize the queue system in your main function:
+
+```go
+ctx := app.InitEmptyEngine()
+app.WithQueue(ctx)
+controller.QueueWorker(ctx)
+```
+
+---
+
+##  How It Works
+
+- Jobs are pushed using `Enqueue(topic, data)` to be processed later.
+- Each queue is identified by a topic string.
+- Workers process jobs from either memory, storage, or both.
+
+---
+
+##  Example Usage
+
+###  Enqueue to Memory (Fast, volatile)
+
+```go
+if err := c.MustQueue().Memory.Enqueue("user:welcome-email", payload); err != nil {
+    c.JSON(500, map[string]string{"error": "Queue error"})
+    return
+}
+```
+
+###  Enqueue to Storage (Durable, file-based)
+
+```go
+if err := c.MustQueue().Storage.Enqueue("user:welcome-email", payload); err != nil {
+    c.JSON(500, map[string]string{"error": "Queue error"})
+    return
+}
+```
+
+###  Default Behavior
+
+When using:
+
+```go
+c.MustQueue().EnqueueAll("user:welcome-email", payload)
+```
+
+TurboGo will enqueue the job to **both** memory and storage (combined mode).
+
+---
+
+###  Registering Workers
+
+TurboGo allows flexible worker registration depending on delivery mode:
+
+```go
+// Memory worker only
+c.Queue.Memory.RegisterWorker("user:welcome-email", SendWelcomeEmailWorker)
+
+// Storage worker only
+c.Queue.Storage.RegisterWorker("user:welcome-email", SendWelcomeEmailWorker)
+
+// Both memory + storage (default)
+c.Queue.RegisterWorkerAll("user:welcome-email", SendWelcomeEmailWorker)
+```
+
+### Worker example:
+
+```go
+func SendWelcomeEmailWorker(data []byte) error {
+	var input CreateUserInput
+	json.Unmarshal(data, &input)
+	fmt.Printf("👷 Queue Worker: %s <%s>\n", input.Name, input.Email)
+	return nil
+}
+```
+
+---
+
+##  Configuration Modes
+
+TurboGo Queue supports 3 modes:
+
+- **Memory Only**: Temporary, best for speed in dev/test.
+- **File Storage Only**: Ensures durability across restarts.
+- **Combined** *(default)*: Uses both for speed + safety.
+
+---
+
+##  Behind the Scenes
+
+TurboGo Queue uses a dual-layer system:
+
+- **Memory**: Fast, buffered in-RAM processing
+- **Storage**: Durable JSON logs for crash recovery
+
+Jobs can be enqueued to either or both layers.  
+Automatic cleanup runs every 10 minutes, removing jobs older than 24 hours.
+
+---
+
+##  Auto Cleanup
+
+TurboGo automatically cleans up old queue files:
+
+- **Interval**: every `10 * time.Minute`
+- **Retention**: deletes jobs older than `24 * time.Hour`
+
+> No manual intervention needed.
+
+---
+
+## Use Cases
+
+- Email delivery (welcome, verification)
+- Background processing (thumbnails, reports)
+- Asynchronous workflows

@@ -1,0 +1,110 @@
+---
+title: Pubsub
+description: Lightweight publish/subscribe system for in-memory event messaging in TurboGo.
+---
+
+# Configure Pubsub
+
+TurboGo includes an in-memory publish/subscribe (pubsub) system for event-driven communication between components.
+
+---
+
+##  Structure Integration
+
+Pubsub is initialized in `main.go` via:
+
+```go
+ctx := app.InitEmptyEngine()
+app.WithPubsub(ctx)
+go controller.PubsubWorker(ctx)
+```
+
+---
+
+##  How It Works
+
+- Publish messages with `Publish(topic, data)`
+- Listeners consume messages per topic
+- Supports delivery via memory, storage, or both
+
+---
+
+##  Example Usage
+
+### Publish an event:
+
+```go
+// Memory only
+c.MustPubsub().Memory.Publish("user.created", payload)
+
+// Storage only
+c.MustPubsub().Storage.Publish("user.created", payload)
+
+// Both (default)
+c.MustPubsub().PublishAll("user.created", payload)
+```
+
+### Register a subscriber:
+
+Subscribe to events using:
+
+```go
+// Memory only
+ch := c.Pubsub.Memory.Subscribe("user.created")
+
+// Storage only
+ch := c.Pubsub.Storage.Subscribe("user.created")
+
+// Both (default)
+ch := c.Pubsub.SubscribeAll("user.created")
+```
+
+
+### Handling events example:
+
+```go
+for msg := range ch {
+	if err := OnUserCreated(msg); err != nil {
+		fmt.Printf("Error processing pubsub message: %v\n", err)
+	}
+}
+```
+
+---
+
+## Behind the Scenes
+
+TurboGo Pubsub supports two delivery layers:
+
+- **Memory**: Real-time broadcast via channels
+- **Storage**: Persistent logs for reliable delivery
+
+Messages can be published to either or both.  
+Old messages are auto-deleted every 10 minutes if older than 24 hours.
+
+---
+
+##  Configuration Modes
+
+- **Memory Only** – Real-time and fast
+- **Storage Only** – Durable and replayable
+- **Memory + Storage** *(default)* – Combines both
+
+---
+
+##  Auto Cleanup
+
+Stored messages are cleaned up automatically:
+
+- **Interval**: every `10 * time.Minute`
+- **Older Than**: `24 * time.Hour`
+
+> Ensures efficient storage usage.
+
+---
+
+##  Use Cases
+
+- Real-time internal event broadcasting
+- Triggering follow-up processes (e.g. welcome email after registration)
+- Decoupled architecture for in-app modules

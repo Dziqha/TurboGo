@@ -1,0 +1,56 @@
+---
+title: Structure
+description: Overview of the default project structure in TurboGo
+---
+
+#  Project Structure
+
+TurboGo encourages a modular and clean project layout.  
+This is the default folder structure you get when running `turbogo new`.
+
+---
+> ⚠️ The `data/` folder only appears if you use **Queue** or **Pubsub** with file storage mode.
+
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+
+<Files>
+  <Folder name="data" disable>
+    <File name="pubsub.json" />
+    <File name="queue.json" />
+  </Folder>
+  <Folder name="pkg" defaultOpen>
+    <Folder name="controllers" defaultOpen>
+    <File name="user.go" />
+    </Folder>
+    <Folder name="routes" defaultOpen>
+    <File name="router.go" />
+    </Folder>
+  </Folder>
+  <File name=".env" />
+  <File name=".gitignore" />
+  <File name="go.mod" />
+  <File name="go.sum" />
+  <File name="main.go" />
+  <File name="README.md" />
+</Files>
+
+---
+
+##  Structure Highlights
+
+- `pkg/controllers/`: Contains business logic handlers such as user management, authentication, etc.
+- `pkg/routes`: Defines routing rules and middleware setup.
+- `.env`: Holds environment variables like `PORT`, `DB_URL`, and secret keys.
+- `.gitignore`: Specifies which files/folders to exclude from version control (e.g., `.env`, `bin/`, `node_modules/`).
+- `go.mod/go.sum` : Go module metadata and dependency list.
+- `main.go`: Application entry point that initializes the server and core services.
+- `README.md`: Basic documentation about the project, how to run it, and its structure.
+
+---
+
+##  Generated with CLI
+
+This layout is generated automatically when you run:
+
+```bash
+turbogo new my-project

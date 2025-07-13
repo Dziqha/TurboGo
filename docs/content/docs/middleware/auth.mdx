@@ -1,0 +1,59 @@
+---
+title: Auth
+description: JWT middleware for protected routes in TurboGo.
+---
+
+#  Auth Middleware
+
+TurboGo provides JWT authentication middleware for protecting routes using `Authorization: Bearer <token>` headers.
+
+---
+
+## Version
+
+> This documentation refers to **TurboGo Auth v1**.
+
+---
+
+##  Basic Usage
+
+```go
+app.Use(
+  middleware.Recover(),
+  middleware.AuthJWT("my-secret-key"),
+)
+```
+
+---
+
+##  How It Works
+
+- Extracts the `Authorization` header.
+- Validates JWT using HMAC SHA.
+- Aborts request with `401` if the token is missing or invalid.
+- Sets the first string claim into session: `c.SetSession("user", ...)`
+
+---
+
+##  Example Behavior
+
+```http
+Authorization: Bearer <your-jwt-token>
+```
+
+If token is valid, the request proceeds. Otherwise:
+
+```json
+{
+  "error": "unauthorized",
+  "message": "invalid token"
+}
+```
+
+---
+
+## Use Cases
+
+- Protecting APIs with JWT
+- User-based route access
+- Token verification in chained handlers

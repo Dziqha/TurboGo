@@ -1,0 +1,54 @@
+---
+title: Cache
+description: Built-in route-level caching system with TTL support in TurboGo.
+---
+
+#  Configure Cache
+
+TurboGo provides a lightweight built-in caching system that stores responses in memory with optional TTL (time-to-live).
+
+By default, **all `GET` routes are cached for 5 minutes** unless explicitly overridden. Other HTTP methods (`POST`, `PUT`, etc.) are **not cached** unless `.Cache()` is used.
+
+---
+
+##  Structure Integration
+
+```plaintext
+pkg/routes/router.go
+```
+
+This is where routes are registered and caching behavior is configured using `.Cache(ttl)` or `.NoCache()`.
+
+---
+
+##  How It Works
+
+- `GET` routes are automatically cached for 5 minutes (300 seconds).
+- Non-GET methods are never cached by default.
+- You can override caching behavior per route using `.Cache(duration)` or disable it with `.NoCache()`.
+
+---
+
+##  Example Usage
+
+```go
+r.Get("/home", HomeHandler) // Cached by default for 5 minutes
+r.Get("/blog", BlogHandler).Cache(2 * time.Minute)
+r.Get("/stats", StatsHandler).NoCache()
+r.Post("/submit", SubmitHandler).Cache(1 * time.Minute) // Enable cache manually
+```
+
+---
+
+## Behind the Scenes
+
+TurboGo uses an in-memory cache engine optimized for high-throughput web applications.  
+It is built with safe concurrency mechanisms and automatic TTL cleanup to ensure reliable performance and memory efficiency.
+
+---
+
+## Use Cases
+
+- Speed up static or semi-static endpoints
+- Reduce load on database and external APIs
+- Avoid redundant processing for frequent requests

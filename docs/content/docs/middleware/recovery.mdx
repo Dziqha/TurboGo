@@ -1,0 +1,60 @@
+---
+title: Recovery
+description: Panic recovery middleware to prevent server crashes in TurboGo.
+---
+
+#  Recovery Middleware
+
+TurboGo includes a built-in recovery handler to catch unexpected panics and prevent application crashes.
+
+---
+
+##  Version
+
+> This documentation refers to **TurboGo Recovery v1**.
+
+---
+
+##  Basic Usage
+
+```go
+app.Use(
+  middleware.Recover(),
+)
+```
+
+---
+
+##  How It Works
+
+- Wraps each request in a `defer-recover` block.
+- If a panic occurs, it:
+  - Logs the error and stack trace
+  - Returns a safe 500 JSON error response
+
+---
+
+##  Example Error Response
+
+```json
+{
+  "error": "internal server error",
+  "message": "an unexpected error occurred"
+}
+```
+
+And console logs:
+
+```
+[RECOVER] Panic recovered: runtime error: invalid memory address
+[RECOVER] Stack trace:
+...
+```
+
+---
+
+## Use Cases
+
+- Prevent app crashes from unhandled errors
+- Debugging unexpected runtime issues
+- Safer request handling in production
