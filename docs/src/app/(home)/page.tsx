@@ -12,10 +12,10 @@ export default function HomePage() {
 
         {/* Subtitle */}
         <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-          Framework backend Golang yang dirancang untuk performa tinggi dan
-          kemudahan penggunaan. Bangun API yang{" "}
-          <span className="text-blue-600 font-semibold">blazing fast</span>{" "}
-          dengan sintaks yang elegan.
+          A high-performance backend framework for Go, designed for developer
+          productivity and{" "}
+          <span className="text-blue-600 font-semibold">blazing fast</span> API
+          development with elegant syntax.
         </p>
 
         {/* CTA Buttons */}
@@ -24,14 +24,14 @@ export default function HomePage() {
             href="/docs"
             className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-full font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105 hover:-translate-y-1"
           >
-            <span className="relative z-10">Mulai Coding</span>
+            <span className="relative z-10">Get Started</span>
           </Link>
 
           <Link
             href="/docs"
             className="group px-8 py-4 border border-blue-300 rounded-full font-semibold text-blue-600 hover:text-blue-700 hover:border-blue-400 transition-all duration-300 backdrop-blur-sm hover:bg-blue-50"
           >
-            Baca Dokumentasi
+            View Documentation
             <span className="ml-2 group-hover:translate-x-1 transition-transform duration-300 inline-block">
               →
             </span>
@@ -41,7 +41,7 @@ export default function HomePage() {
           {[
             {
               title: "Lightning Fast",
-              desc: "Built with Go untuk performa maksimal dan throughput tinggi",
+              desc: "Built with Go for maximum performance and high throughput.",
               icon: (
                 <path
                   strokeLinecap="round"
@@ -53,7 +53,7 @@ export default function HomePage() {
             },
             {
               title: "Simple & Elegant",
-              desc: "Sintaks yang bersih dan API yang intuitif untuk development yang efisien",
+              desc: "Clean syntax and intuitive API for efficient development experience.",
               icon: (
                 <path
                   strokeLinecap="round"
@@ -65,7 +65,7 @@ export default function HomePage() {
             },
             {
               title: "Production Ready",
-              desc: "Fitur lengkap untuk aplikasi skala enterprise dengan ekosistem yang kuat",
+              desc: "Full-featured and scalable — built for enterprise-grade applications.",
               icon: (
                 <path
                   strokeLinecap="round"
