@@ -1,0 +1,27 @@
+{
+  "name": "create-turbogo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "create-turbogo": "bin/index.js"
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "execa": "^9.6.0",
+    "fs-extra": "^11.3.0",
+    "inquirer": "^12.7.0",
+    "ora": "^8.2.0"
+  }
+}
