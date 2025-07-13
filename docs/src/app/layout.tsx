@@ -2,16 +2,14 @@ import '@/app/global.css';
 import { RootProvider } from 'fumadocs-ui/provider';
 import { Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
+import { defaultMetadata } from './metadata';
+
+
+export const metadata = defaultMetadata;
 
 const inter = Inter({
   subsets: ['latin'],
 });
-
-export const metadata = {
-  icons : {
-    icon: '/images/cyclone.png',
-  }
-}
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
