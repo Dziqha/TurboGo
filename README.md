@@ -4,27 +4,29 @@
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/Coverage-ComingSoon-yellow)]()
 
-TurboGo adalah framework backend berbasis Go yang ringan, middleware-first, dan event-driven. Fokus utama pada kecepatan, kemudahan extensibility, dan developer experience.
+**TurboGo** is a blazing-fast, middleware-first, and event-driven web framework built with Go — inspired by Express, but optimized for high concurrency, clean extensibility, and developer control.
 
 ---
 
 ## 📁 Project Structure
 
-```
+```bash
+
 turbogo/
-├── cmd/turbogo/        # CLI commands (generate, etc)
-├── core/               # HTTP context, router, logger, handler base
-├── internal/           # Engine untuk cache, pubsub, queue, concurrency
-│   ├── cache/          # Redis-like engine (in-memory)
-│   ├── pubsub/         # Kafka-style pubsub engine
-│   ├── queue/          # RabbitMQ-style task queue
-│   └── concurrency/    # Utility async/goroutine/mutex helpers
-├── middleware/         # Auth, Logger, Recovery, Cache layer
-├── examples/           # Example main.go app
-├── test/               # Benchmark & unit test
-├── app.go              # Main app entry
-├── makefile
+├── templates/          # CLI template & generator
+├── core/               # HTTP context, router, handler base
+├── internal/           # In-memory engines for pubsub, queue, cache, etc
+│   ├── cache/          # Redis-like in-memory cache engine
+│   ├── pubsub/         # Kafka-style pub/sub with topic fanout
+│   ├── queue/          # Simple async job/task queue
+│   └── concurrency/    # Goroutine pool, async control, lock/mutex helpers
+├── middleware/         # Built-in middlewares: logger, auth, recovery
+├── examples/           # Usage examples with main.go
+├── test/               # Unit tests and benchmarks
+├── app.go              # TurboGo core application entry
+├── makefile            # Build, test, benchmark automation
 └── README.md
+
 ```
 
 ---
@@ -71,60 +73,121 @@ turbogo/
 
 ---
 
-## 🔐 Middleware: Auth Example
+## ⚙️ Features
 
-Gunakan `AUTH_SECRET` dari environment:
+- ✅ **Middleware-first** — use `.Use()` like Express.js
+- ⚡ **Ultra-fast** router & context engine
+- 🔄 **Built-in async engines** (PubSub, Queue, Cache)
+- 🧠 **Extensible** and clean internal architecture
+- 🔐 **Optional middleware**: Auth, Logger, Recovery, Auto-cache
+- 🧪 Benchmark & unit-test ready
+- 🛠️ CLI generator: `create-turbogo` for instant project scaffolding
+
+---
+
+## 🔐 Example: Auth Middleware
+
+Use the built-in auth middleware with environment variable `AUTH_SECRET`:
 
 ```go
 app.Use(middleware.Auth(os.Getenv("AUTH_SECRET")))
 ```
 
-Atur env:
+Set your secret in `.env`:
+
 ```bash
 export AUTH_SECRET=supersecurekey123
 ```
 
 ---
 
+## 🚀 CLI: Create TurboGo App
+
+Install the TurboGo CLI:
+
+```bash
+npx create-turbogo myapp
+```
+
+```bash
+cd myapp
+
+go run .
+```
+
+## 🚀 Manual Instalation TurboGo
+
+```bash
+go get github.com/Dziqha/TurboGo
+```
+
+
+---
+
 ## 📦 Layer Breakdown
 
-| Layer                | File                            | Deskripsi                                               |
-|---------------------|----------------------------------|----------------------------------------------------------|
-| Router              | `core/routing.go`                | Basic `.Get()`, `.Post()` route register                |
-| Middleware          | `middleware/logger.go`, `auth.go`| Middleware pipeline (logger, auth, recovery, cache)     |
-| Redis Auto-Cache    | `middleware/cache.go`            | Cek dan simpan response otomatis via path/key           |
-| Handler             | `handlers/*.go`                  | Business logic dibuat oleh developer                    |
-| Embedded Engines    | `internal/*`                     | TaskQueue, PubSub, dan Cache in-memory engine           |
-| Concurrency Tools   | `internal/concurrency/*.go`      | Channel pool, goroutine control, mutex helper           |
+| Layer           | Location                                | Description                                 |
+| --------------- | --------------------------------------- | ------------------------------------------- |
+| **Routing**     | `core/routing.go`                       | Lightweight HTTP router with method support |
+| **Middleware**  | `middleware/logger.go`, `auth.go`, etc. | Plug-and-play middleware support            |
+| **Auto Cache**  | `middleware/cache.go`                   | Automatic path-based caching layer          |
+| **Handlers**    | `internal/controller/`                  | Developer-defined business logic            |
+| **Engines**     | `internal/pubsub/`, `queue/`, `cache/`  | Event engines without external dependencies |
+| **Concurrency** | `internal/concurrency/`                 | Goroutine pooling, async, and locking utils |
 
 ---
 
 ## 📊 Benchmark Summary
 
-> Jalankan:
+Run with:
+
 ```bash
 make bench
 ```
 
-| Benchmark                        | ns/op    | Mem | Alloc | Status |
-|----------------------------------|----------|------|--------|--------|
-| `BenchmarkPubSub_1000Messages`   | ~265     | 249B | 4x     | ✅     |
-| `BenchmarkTaskQueue_1000Tasks`   | ~0.02    | 0B   | 0      | ✅     |
-| `BenchmarkTaskQueue_WithDelay`   | ~0.17    | 0B   | 0      | ✅     |
-| `BenchmarkTaskQueue_CPUProfile`  | ~592     | 4B   | 1x     | ✅     |
+| Benchmark                       | Time (ns/op) | Mem  | Alloc | Status |
+| ------------------------------- | ------------ | ---- | ----- | ------ |
+| `BenchmarkPubSub_1000Messages`  | \~265        | 249B | 4x    | ✅      |
+| `BenchmarkTaskQueue_1000Tasks`  | \~0.02       | 0B   | 0     | ✅      |
+| `BenchmarkTaskQueue_WithDelay`  | \~0.17       | 0B   | 0     | ✅      |
+| `BenchmarkTaskQueue_CPUProfile` | \~592        | 4B   | 1x    | ✅      |
 
 ---
 
-## ✅ Goals
+## 🧰 TurboGo CLI (`create-turbogo`)
 
-- ⚙️ Middleware-first, seperti Express
-- 📮 Mendukung Kafka, RabbitMQ tanpa import eksternal
-- ⚡ Sangat cepat (sub-microsecond op)
-- 🧠 Clean code & extensible
-- ✅ Siap digunakan untuk proyek microservice, REST API, atau pubsub pipelines
+> Scaffold TurboGo apps instantly via CLI.
+
+```bash
+create-turbogo myapp
+```
+
+Prompted features:
+
+* ✅ Controller name
+* 🔐 Enable dummy Auth
+* 📁 Structure auto-generated
 
 ---
 
-```
-Created with ❤️ by TurboGo
-```
+## ✅ Ideal For
+
+* ⚙️ Microservices / REST APIs
+* 🚚 Background jobs / task queues
+* 📡 Event-driven systems (pub/sub pipelines)
+* 🧪 High-performance concurrent services
+
+---
+
+## ❤️ About
+
+TurboGo is handcrafted with performance, simplicity, and extensibility in mind — empowering developers to build Go web backends without the bloat.
+
+---
+
+**Ready to go fast? Build with TurboGo.** 🌀
+Give it a ⭐ on GitHub if you like it!
+
+---
+
+> Built with love by [@dziqha](https://github.com/dziqha)
