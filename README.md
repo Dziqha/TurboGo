@@ -12,7 +12,7 @@ TurboGo adalah framework backend berbasis Go yang ringan, middleware-first, dan 
 
 ```
 turbogo/
-├── cmd/                # CLI commands (generate, etc)
+├── cmd/turbogo/        # CLI commands (generate, etc)
 ├── core/               # HTTP context, router, logger, handler base
 ├── internal/           # Engine untuk cache, pubsub, queue, concurrency
 │   ├── cache/          # Redis-like engine (in-memory)
