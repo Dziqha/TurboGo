@@ -1,11 +1,24 @@
 ---
-title: Cli
+title: CLI
 description: Generate projects and scaffolding using the TurboGo CLI.
 ---
 
 #  TurboGo CLI
 
-TurboGo provides a simple command-line interface (CLI) to generate starter projects and code scaffolding.
+TurboGo provides a simple, flexible command-line interface (CLI) to generate starter projects and scaffolding instantly — powered by **Node.js**, not Golang binary.
+
+---
+
+##  Why Node.js CLI?
+
+Unlike Go-based CLIs, TurboGo CLI is implemented in **Node.js** using tools like `commander`, `inquirer`, and `chalk` for:
+
+- Better interactive prompts
+- Cross-platform support (Windows/macOS/Linux)
+- Easier development and fast iteration
+- Ecosystem advantage (rich CLI UI tools)
+
+> ⚠️ We intentionally use Node.js to overcome limitations of Go's CLI tooling, especially for rich interactive workflows.
 
 ---
 
@@ -15,29 +28,17 @@ TurboGo provides a simple command-line interface (CLI) to generate starter proje
 
 ---
 
-##  Installation
+## Installation
 
-Install the CLI with:
+No need to install anything globally. Just run:
 
-```sh
-go install github.com/username/turbogo/cmd@latest
-```
-
-This makes the `turbogo` command available globally.
-
----
-
-##  Usage
-
-### Create a New Project
-
-```sh
-turbogo new my-app
-```
+```bash
+npx create-turbogo my-app
+````
 
 This will generate the default TurboGo project structure:
 
-```
+```bash
 my-app/
 ├── main.go
 ├── go.mod
@@ -51,14 +52,38 @@ my-app/
 
 ##  Features
 
-- ✅ Create project boilerplate
-- ✅ Clean folder structure
-- ✅ Pre-wired routes, controller, and main app entry
+* ✅ Generate full project boilerplate
+* ✅ Clean folder structure (controller, router, entrypoint)
+* ✅ Preconfigured `go.mod`, `.env`, `.gitignore`
+* ✅ Optional dummy controller or auth setup
 
 ---
 
-## Use Cases
+##  Use Cases
 
-- Kickstart new TurboGo projects instantly
-- Enforce consistent project layout
-- Save time scaffolding boilerplate code
+* Kickstart new TurboGo projects in seconds
+* Save time scaffolding repetitive structure
+* Ensure consistent architecture across teams
+
+---
+
+##  Example Command
+
+```bash
+npx create-turbogo myapp
+```
+
+Follow the prompt and your project will be scaffolded automatically.
+
+---
+
+## Pro Tip
+
+After generation:
+
+```bash
+cd myapp
+go run .
+```
+
+Start coding your next backend with the speed of TurboGo! 🌀
