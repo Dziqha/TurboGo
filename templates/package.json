@@ -3,18 +3,26 @@
   "version": "1.0.0",
   "main": "index.js",
   "bin": {
-    "create-turbogo": "bin/index.js"
+    "create-turbogo": "./bin/index.js"
   },
   "directories": {
     "lib": "lib"
   },
   "type": "module",
+  "keywords": [
+    "cli",
+    "golang",
+    "generator",
+    "turbogo"
+  ],
+  "author": "Dziqha",
+  "license": "MIT",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "description": "",
   "dependencies": {
     "chalk": "^5.4.1",

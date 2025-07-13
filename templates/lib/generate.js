@@ -44,13 +44,13 @@ function generateMainFile(projectName, controllerName) {
 
 import (
 	"github.com/Dziqha/TurboGo"
-	"${projectName}/pkg/controller"
-	"${projectName}/pkg/router"
+	"${projectName}/pkg/controllers"
+	"${projectName}/pkg/routes"
 )
 
 func main() {
 	app := TurboGo.New()
-	ctrl := controller.New${controllerName}Controller()
+	ctrl := controllers.New${controllerName}Controller()
 	router.NewRouter(app, ctrl)
 	app.RunServer(":8080")
 }
@@ -59,7 +59,7 @@ func main() {
 
 function generateHandlerController(name) {
   const lower = name.toLowerCase();
-  return `package controller
+  return `package controllers
 
 import (
 	"fmt"
@@ -80,14 +80,14 @@ func (h *${name}Controller) Get(c *core.Context) {
 }
 
 function generateRouter(projectName, controllerName) {
-  return `package router
+  return `package routes
 
 import (
 	"github.com/Dziqha/TurboGo/core"
-	"${projectName}/pkg/controller"
+	"${projectName}/pkg/controllers"
 )
 
-func NewRouter(router core.Router, c *controller.${controllerName}Controller) {
+func NewRouter(router core.Router, c *controllers.${controllerName}Controller) {
 	app := router.Group("/api")
 	app.Get("/hello", c.Get)
 }
@@ -113,7 +113,7 @@ function generateGitignore() {
 function generateReadme(project) {
   return `# 🚀 ${project}
 
-Generated with [TurboGo CLI](https://github.com/username/TurboGo)
+Generated with [TurboGo CLI](https://github.com/Dziqha/TurboGo)
 
 ## 🚦 Jalankan:
 
@@ -122,7 +122,7 @@ go run .
 ## 📁 Struktur
 
 - main.go — Entry point
-- pkg/router — Routing logic
-- pkg/controller — Handler & controller
+- pkg/routes — Routing logic
+- pkg/controllers — Handler & controller
 `;
 }
