@@ -77,7 +77,7 @@ jobs:
           git tag -f $MAJOR ${{ steps.bump.outputs.new_tag }}
           git push origin $MAJOR --force
 
-      - name: Generate changelog text with PR info
+      - name: Generate changelog  with PR info
         id: changelog
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
