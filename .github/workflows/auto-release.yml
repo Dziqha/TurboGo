@@ -24,10 +24,9 @@ jobs:
       - name: Get latest tag
         id: get_tag
         run: |
-          TAG=$(git tag --sort=-creatordate | head -n1)
+          TAG=$(git tag | sort -V | tail -n1)
           if [ -z "$TAG" ]; then TAG="v0.0.0"; fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-
       - name: Detect version bump type
         id: version_type
         run: |
