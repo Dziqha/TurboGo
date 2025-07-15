@@ -1,4 +1,4 @@
-name: TurboGo Smart Version & Release
+name: TurboGo Auto Release
 
 on:
   push:
@@ -16,64 +16,43 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PERSONAL_TOKEN }}
 
-      - name: Setup Git
+      - name: Set up Git
         run: |
           git config user.name "Dziqha"
-          git config user.email "abdurrohmanhaadziq@gmail.com"
+          git config user.email "abdurrohmanhaadziq@gmail.ccom"
 
       - name: Get latest tag
         id: get_tag
-        run: |
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+        run: echo "tag=$(git describe --tags --abbrev=0 || echo 0.0.0)" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        id: bump
+        run: echo "new_tag=v$(npx semver -i minor ${{ steps.get_tag.outputs.tag }})" >> $GITHUB_OUTPUT
 
       - name: Get commit type
         id: commit
         run: |
-          MSG=$(git log -1 --pretty=%s)
-          echo "Commit msg: $MSG"
-          echo "message=$MSG" >> $GITHUB_OUTPUT
-          if [[ "$MSG" == *"BREAKING CHANGE"* || "$MSG" == *"!:"* ]]; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif [[ "$MSG" == feat* ]]; then
-            echo "type=minor" >> $GITHUB_OUTPUT
-          else
-            echo "type=patch" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Bump version
-        id: bump
-        run: |
-          TAG=${{ steps.get_tag.outputs.tag }}
-          TYPE=${{ steps.commit.outputs.type }}
-          VERSION=${TAG#v}
-          IFS='.' read -ra VER <<< "$VERSION"
-          MAJOR=${VER[0]}
-          MINOR=${VER[1]}
-          PATCH=${VER[2]}
-
-          if [ "$TYPE" == "major" ]; then
-            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
-          elif [ "$TYPE" == "minor" ]; then
-            MINOR=$((MINOR+1)); PATCH=0
-          else
-            PATCH=$((PATCH+1))
-          fi
-
-          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "Bumped to $NEW_TAG"
+          TYPE=$(git log -1 --pretty=%s | grep -oE '^(feat|fix|chore|docs|refactor|ci|test)(?=:)')
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
 
       - name: Create tag and push
         run: |
           git tag ${{ steps.bump.outputs.new_tag }}
           git push origin ${{ steps.bump.outputs.new_tag }}
 
-      - name: Generate changelog
+      - name: Generate CHANGELOG.md (for release body)
         id: changelog
         run: |
-          MSG=$(git log -1 --pretty=format:"- %s (%an)")
-          echo "log=$MSG" >> $GITHUB_OUTPUT
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURR_TAG=${{ steps.bump.outputs.new_tag }}
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "## ${CURR_TAG}" >> $GITHUB_OUTPUT
+          if [ -n "$PREV_TAG" ]; then
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" >> $GITHUB_OUTPUT
+          else
+            git log --pretty=format:"- %s (%an)" >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -81,7 +60,17 @@ jobs:
           token: ${{ secrets.PERSONAL_TOKEN }}
           tag_name: ${{ steps.bump.outputs.new_tag }}
           name: Release ${{ steps.bump.outputs.new_tag }}
-          body: |
-            🔖 **Commit Type:** ${{ steps.commit.outputs.type }}
-            📦 **What's Changed:**
-            ${{ steps.changelog.outputs.log }}
+          body: ${{ steps.changelog.outputs.changelog }}
+
+      - name: Send Telegram Notification
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VERSION: ${{ steps.bump.outputs.new_tag }}
+          MESSAGE: ${{ steps.changelog.outputs.changelog }}
+        run: |
+          TEXT="📆 *TurboGo Released ${VERSION}*%0A🔖 Type: ${{ steps.commit.outputs.type }}%0A📝 Changelog:%0A${MESSAGE}"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d parse_mode="Markdown" \
+            -d text="$TEXT"
