@@ -19,7 +19,7 @@ jobs:
       - name: Set up Git
         run: |
           git config user.name "Dziqha"
-          git config user.email "abdurrohmanhaadziq@gmail.ccom"
+          git config user.email "abdurrohmanhaadziq@gmail.com"
 
       - name: Get latest tag
         id: get_tag
@@ -34,6 +34,7 @@ jobs:
         run: |
           TYPE=$(git log -1 --pretty=%s | sed -E 's/^([a-z]+):.*/\1/' | grep -E '^(feat|fix|chore|docs|refactor|ci|test)$' || echo "other")
           echo "type=$TYPE" >> $GITHUB_OUTPUT
+
       - name: Create tag and push
         run: |
           git tag ${{ steps.bump.outputs.new_tag }}
@@ -44,14 +45,26 @@ jobs:
         run: |
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           CURR_TAG=${{ steps.bump.outputs.new_tag }}
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "## ${CURR_TAG}" >> $GITHUB_OUTPUT
+          
+          # Use a temporary file to build the changelog
+          CHANGELOG_FILE=$(mktemp)
+          echo "## ${CURR_TAG}" > "$CHANGELOG_FILE"
+          
           if [ -n "$PREV_TAG" ]; then
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" >> $GITHUB_OUTPUT
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" >> "$CHANGELOG_FILE"
           else
-            git log --pretty=format:"- %s (%an)" >> $GITHUB_OUTPUT
+            git log --pretty=format:"- %s (%an)" >> "$CHANGELOG_FILE"
           fi
-          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Set the multiline output using the recommended format
+          {
+            echo "changelog<<EOF"
+            cat "$CHANGELOG_FILE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          
+          # Clean up
+          rm "$CHANGELOG_FILE"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -66,9 +79,16 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           VERSION: ${{ steps.bump.outputs.new_tag }}
-          MESSAGE: ${{ steps.changelog.outputs.changelog }}
         run: |
-          TEXT="📆 *TurboGo Released ${VERSION}*%0A🔖 Type: ${{ steps.commit.outputs.type }}%0A📝 Changelog:%0A${MESSAGE}"
+          # Get the changelog content and format it for Telegram
+          CHANGELOG_CONTENT=$(cat <<'EOF'
+          ${{ steps.changelog.outputs.changelog }}
+          EOF
+          )
+          
+          # URL encode the message for Telegram
+          TEXT="📆 *TurboGo Released ${VERSION}*%0A🔖 Type: ${{ steps.commit.outputs.type }}%0A📝 Changelog:%0A${CHANGELOG_CONTENT}"
+          
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d parse_mode="Markdown" \
