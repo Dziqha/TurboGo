@@ -25,20 +25,38 @@ jobs:
         id: get_tag
         run: echo "tag=$(git describe --tags --abbrev=0 || echo 0.0.0)" >> $GITHUB_OUTPUT
 
+      - name: Detect version bump type
+        id: version_type
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          if echo "$MSG" | grep -q "BREAKING CHANGE"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -q "^feat!:" || echo "$MSG" | grep -q "^feat.*!"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -q "^feat:"; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -q "^fix:"; then
+            echo "type=patch" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+
       - name: Bump version
         id: bump
-        run: echo "new_tag=v$(npx semver -i minor ${{ steps.get_tag.outputs.tag }})" >> $GITHUB_OUTPUT
-
-      - name: Get commit type
-        id: commit
         run: |
-          TYPE=$(git log -1 --pretty=%s | sed -E 's/^([a-z]+):.*/\1/' | grep -E '^(feat|fix|chore|docs|refactor|ci|test)$' || echo "other")
-          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          OLD_TAG=${{ steps.get_tag.outputs.tag }}
+          TYPE=${{ steps.version_type.outputs.type }}
+          echo "new_tag=v$(npx semver -i $TYPE $OLD_TAG)" >> $GITHUB_OUTPUT
 
       - name: Create tag and push
         run: |
           git tag ${{ steps.bump.outputs.new_tag }}
           git push origin ${{ steps.bump.outputs.new_tag }}
+
+      - name: Push major alias tag
+        run: |
+          MAJOR=$(echo "${{ steps.bump.outputs.new_tag }}" | cut -d '.' -f1)
+          git tag -f $MAJOR ${{ steps.bump.outputs.new_tag }}
+          git push origin $MAJOR --force
 
       - name: Generate changelog text with PR info
         id: changelog
@@ -109,8 +127,9 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           VERSION: ${{ steps.bump.outputs.new_tag }}
+          TYPE: ${{ steps.version_type.outputs.type }}
         run: |
-          TEXT="📆 *TurboGo Released ${VERSION}*%0A🔖 Type: ${{ steps.commit.outputs.type }}%0A📝 Changelog:%0A$(sed ':a;N;$!ba;s/\n/%0A/g' changelog.txt)"
+          TEXT="📆 *TurboGo Released ${VERSION}*%0A🔖 Type: ${TYPE}%0A📝 Changelog:%0A$(sed ':a;N;$!ba;s/\n/%0A/g' changelog.txt)"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d parse_mode="Markdown" \
