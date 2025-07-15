@@ -46,25 +46,14 @@ jobs:
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           CURR_TAG=${{ steps.bump.outputs.new_tag }}
           
-          # Use a temporary file to build the changelog
-          CHANGELOG_FILE=$(mktemp)
-          echo "## ${CURR_TAG}" > "$CHANGELOG_FILE"
-          
+          # Create changelog as a single line with newlines encoded
           if [ -n "$PREV_TAG" ]; then
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" >> "$CHANGELOG_FILE"
+            CHANGELOG="## ${CURR_TAG}%0A$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" | sed 's/$/\\n/' | tr -d '\n')"
           else
-            git log --pretty=format:"- %s (%an)" >> "$CHANGELOG_FILE"
+            CHANGELOG="## ${CURR_TAG}%0A$(git log --pretty=format:"- %s (%an)" | sed 's/$/\\n/' | tr -d '\n')"
           fi
           
-          # Set the multiline output using the recommended format
-          {
-            echo "changelog<<EOF"
-            cat "$CHANGELOG_FILE"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-          
-          # Clean up
-          rm "$CHANGELOG_FILE"
+          echo "changelog=${CHANGELOG}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
