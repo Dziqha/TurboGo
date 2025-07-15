@@ -1,0 +1,86 @@
+name: TurboGo Smart Version & Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PERSONAL_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "Dziqha"
+          git config user.email "abdurrohmanhaadziq@gmail.com"
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Get commit type
+        id: commit
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          echo "Commit msg: $MSG"
+          echo "message=$MSG" >> $GITHUB_OUTPUT
+          if [[ "$MSG" == *"BREAKING CHANGE"* || "$MSG" == *"!:"* ]]; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif [[ "$MSG" == feat* ]]; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        id: bump
+        run: |
+          TAG=${{ steps.get_tag.outputs.tag }}
+          TYPE=${{ steps.commit.outputs.type }}
+          VERSION=${TAG#v}
+          IFS='.' read -ra VER <<< "$VERSION"
+          MAJOR=${VER[0]}
+          MINOR=${VER[1]}
+          PATCH=${VER[2]}
+
+          if [ "$TYPE" == "major" ]; then
+            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
+          elif [ "$TYPE" == "minor" ]; then
+            MINOR=$((MINOR+1)); PATCH=0
+          else
+            PATCH=$((PATCH+1))
+          fi
+
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "Bumped to $NEW_TAG"
+
+      - name: Create tag and push
+        run: |
+          git tag ${{ steps.bump.outputs.new_tag }}
+          git push origin ${{ steps.bump.outputs.new_tag }}
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          MSG=$(git log -1 --pretty=format:"- %s (%an)")
+          echo "log=$MSG" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.bump.outputs.new_tag }}
+          name: Release ${{ steps.bump.outputs.new_tag }}
+          body: |
+            🔖 **Commit Type:** ${{ steps.commit.outputs.type }}
+            📦 **What's Changed:**
+            ${{ steps.changelog.outputs.log }}
