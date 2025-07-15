@@ -82,7 +82,7 @@ export AUTH_SECRET=supersecurekey123
 
 ## 🚀 Getting started
 
-###  Manual Instalation TurboGo
+###  Manual Installation TurboGo
 
 ```bash
 go get github.com/Dziqha/TurboGo
