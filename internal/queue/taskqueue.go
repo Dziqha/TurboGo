@@ -3,25 +3,32 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
+	"strings"
 	"sync"
 )
 
 type TaskQueue struct {
-	mu      sync.RWMutex
-	queues  map[string]chan []byte
-	workers map[string][]context.CancelFunc
-	closed  bool
+	mu                   sync.RWMutex
+	queues               map[string]chan []byte
+	workers              map[string][]context.CancelFunc
+	closed               bool
+	AllowMultipleWorkers bool // ✅ optional: true = banyak worker per queue
 }
 
 func NewInMem() *TaskQueue {
 	return &TaskQueue{
 		queues:  make(map[string]chan []byte),
 		workers: make(map[string][]context.CancelFunc),
-		closed:  false,
 	}
 }
 
 func (q *TaskQueue) Enqueue(queue string, task []byte) error {
+	if strings.TrimSpace(queue) == "" {
+		return errors.New("queue name is required")
+	}
+
 	q.mu.RLock()
 	ch, ok := q.queues[queue]
 	closed := q.closed
@@ -56,33 +63,53 @@ func (q *TaskQueue) RegisterWorker(queue string, handler func([]byte) error) err
 	if q.closed {
 		return errors.New("task queue is closed")
 	}
+	if strings.TrimSpace(queue) == "" {
+		return errors.New("queue name is required")
+	}
+	if !q.AllowMultipleWorkers {
+		if _, exists := q.workers[queue]; exists {
+			return fmt.Errorf("worker for queue %q already exists", queue)
+		}
+	}
+
 	ch, ok := q.queues[queue]
 	if !ok {
-		ch = make(chan []byte, 10000) // ✅ buffer besar agar tidak deadlock saat enqueue masif
+		ch = make(chan []byte, 10000)
 		q.queues[queue] = ch
 	}
 
-	// Daftarkan context cancel, agar bisa graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
-	q.workers[queue] = append(q.workers[queue], cancel)
+	q.workers[queue] = append(q.workers[queue], cancel) // ✅ now supports multiple workers if allowed
 
-	// Jalankan worker dalam goroutine
 	go func() {
 		for {
 			select {
 			case msg, ok := <-ch:
 				if !ok {
-					return // channel ditutup
+					return
 				}
-				_ = handler(msg) // abaikan error untuk sekarang
+				_ = safeHandler(handler)(msg)
 			case <-ctx.Done():
-				return // shutdown
+				return
 			}
 		}
 	}()
 
 	return nil
 }
+
+func safeHandler(handler func([]byte) error) func([]byte) error {
+	return func(msg []byte) error {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Worker Panic] recovered: %v", r)
+			}
+		}()
+		return handler(msg)
+	}
+}
+
+
 
 
 func (q *TaskQueue) GetQueueSize(queue string) int {

@@ -1,9 +1,12 @@
 package test
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
-	_"sync/atomic"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -456,26 +459,30 @@ func BenchmarkPubSub_1000Messages(b *testing.B) {
 
 func BenchmarkTaskQueue_1000Tasks(b *testing.B) {
 	q := queue.NewInMem()
+	q.AllowMultipleWorkers = true // kalau kamu pakai pembatas sebelumnya
 	defer q.Close()
 
-	// Channel untuk sync completion
 	done := make(chan bool, b.N)
 
-	_ = q.RegisterWorker("bench", func(data []byte) error {
-		done <- true
-		return nil
-	})
-
-	b.ResetTimer()
-	
-	// Enqueue semua task
+	// Daftar multiple worker
 	for i := 0; i < 8; i++ {
 		_ = q.RegisterWorker("bench", func(data []byte) error {
 			done <- true
 			return nil
 		})
 	}
-	
+
+	b.ResetTimer()
+
+	// Enqueue semua task
+	for i := 0; i < b.N; i++ {
+		_ = q.Enqueue("bench", []byte("task"))
+	}
+
+	// Tunggu semua task selesai
+	for i := 0; i < b.N; i++ {
+		<-done
+	}
 }
 
 func BenchmarkTaskQueue_WithDelay(b *testing.B) {
@@ -613,4 +620,798 @@ func BenchmarkTaskQueue_Print(b *testing.B) {
 
 	elapsed := time.Since(start)
 	fmt.Printf("TaskQueue: handled %d messages in %v (%.2f msg/sec)\n", b.N, elapsed, float64(b.N)/elapsed.Seconds())
+}
+
+// ========== NEW TASK QUEUE TESTS ==========
+
+func TestTaskQueue_ErrorHandling(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var errorCount int64
+	var successCount int64
+
+	err := q.RegisterWorker("error-prone", func(msg []byte) error {
+		message := string(msg)
+		if message == "error" {
+			atomic.AddInt64(&errorCount, 1)
+			return errors.New("simulated error")
+		}
+		atomic.AddInt64(&successCount, 1)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// Enqueue tasks with some errors
+	tasks := []string{"success1", "error", "success2", "error", "success3"}
+	for _, task := range tasks {
+		_ = q.Enqueue("error-prone", []byte(task))
+	}
+
+	// Wait for processing
+	time.Sleep(200 * time.Millisecond)
+
+	assert.Equal(t, int64(2), atomic.LoadInt64(&errorCount))
+	assert.Equal(t, int64(3), atomic.LoadInt64(&successCount))
+}
+
+func TestTaskQueue_WorkerPanic(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var panicCount int64
+	var normalCount int64
+
+	err := q.RegisterWorker("panic-test", func(msg []byte) error {
+		message := string(msg)
+		if message == "panic" {
+			atomic.AddInt64(&panicCount, 1)
+			panic("simulated panic")
+		}
+		atomic.AddInt64(&normalCount, 1)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// Enqueue tasks with panic
+	tasks := []string{"normal1", "panic", "normal2", "panic", "normal3"}
+	for _, task := range tasks {
+		_ = q.Enqueue("panic-test", []byte(task))
+	}
+
+	// Wait for processing
+	time.Sleep(200 * time.Millisecond)
+
+	// Should continue processing after panic
+	assert.Equal(t, int64(2), atomic.LoadInt64(&panicCount))
+	assert.Equal(t, int64(3), atomic.LoadInt64(&normalCount))
+}
+
+func TestTaskQueue_DuplicateWorkerRegistration(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	handler := func(msg []byte) error { return nil }
+
+	err1 := q.RegisterWorker("duplicate", handler)
+	assert.NoError(t, err1)
+
+	err2 := q.RegisterWorker("duplicate", handler)
+	// Should handle duplicate registration gracefully
+	assert.Error(t, err2)
+}
+
+func TestTaskQueue_EmptyQueueName(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	err := q.Enqueue("", []byte("data"))
+	assert.Error(t, err)
+
+	err = q.RegisterWorker("", func(msg []byte) error { return nil })
+	assert.Error(t, err)
+}
+
+func TestTaskQueue_NilMessage(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var received bool
+	var mu sync.Mutex
+
+	err := q.RegisterWorker("nil-test", func(msg []byte) error {
+		mu.Lock()
+		defer mu.Unlock()
+		received = true
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = q.Enqueue("nil-test", nil)
+	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	assert.True(t, received)
+	mu.Unlock()
+}
+
+func TestTaskQueue_LargeMessage(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var received []byte
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	err := q.RegisterWorker("large", func(msg []byte) error {
+		mu.Lock()
+		defer mu.Unlock()
+		received = make([]byte, len(msg))
+		copy(received, msg)
+		wg.Done()
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// Create 1MB message
+	largeMsg := make([]byte, 1024*1024)
+	for i := range largeMsg {
+		largeMsg[i] = byte(i % 256)
+	}
+
+	err = q.Enqueue("large", largeMsg)
+	assert.NoError(t, err)
+
+	wg.Wait()
+
+	mu.Lock()
+	assert.Equal(t, len(largeMsg), len(received))
+	assert.Equal(t, largeMsg, received)
+	mu.Unlock()
+}
+
+func TestTaskQueue_HighLoad(t *testing.T) {
+	q := queue.NewInMem()
+	q.AllowMultipleWorkers = true
+	defer q.Close()
+
+	const numTasks = 10000
+	var processed int64
+
+	// Register multiple workers
+	for i := 0; i < 10; i++ {
+		err := q.RegisterWorker("high-load", func(msg []byte) error {
+			atomic.AddInt64(&processed, 1)
+			return nil
+		})
+		assert.NoError(t, err)
+	}
+
+	// Enqueue many tasks
+	for i := 0; i < numTasks; i++ {
+		_ = q.Enqueue("high-load", []byte(fmt.Sprintf("task-%d", i)))
+	}
+
+	// Wait for processing with timeout
+	timeout := time.After(10 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatalf("timeout: only processed %d out of %d tasks", atomic.LoadInt64(&processed), numTasks)
+		case <-ticker.C:
+			if atomic.LoadInt64(&processed) >= numTasks {
+				return
+			}
+		}
+	}
+}
+
+func TestTaskQueue_ContextCancellation(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var processed int64
+
+	err := q.RegisterWorker("context-test", func(msg []byte) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			atomic.AddInt64(&processed, 1)
+			time.Sleep(50 * time.Millisecond)
+			return nil
+		}
+	})
+	assert.NoError(t, err)
+
+	// Enqueue tasks
+	for i := 0; i < 10; i++ {
+		_ = q.Enqueue("context-test", []byte(fmt.Sprintf("task-%d", i)))
+	}
+
+	// Cancel context after some processing
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	// Wait a bit more
+	time.Sleep(200 * time.Millisecond)
+
+	processedCount := atomic.LoadInt64(&processed)
+	assert.True(t, processedCount < 10, "should have cancelled some tasks")
+}
+
+// ========== NEW PUBSUB TESTS ==========
+
+func TestPubSub_TopicWithSpecialCharacters(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topics := []string{
+		"topic/with/slashes",
+		"topic.with.dots",
+		"topic-with-dashes",
+		"topic_with_underscores",
+		"topic@with@at",
+		"topic with spaces",
+		"topic#with#hash",
+		"数据库更新", // Chinese characters
+		"пользователь_создан", // Cyrillic
+	}
+
+	for _, topic := range topics {
+		ch := ps.Memory.Subscribe(topic)
+		defer ps.Memory.Unsubscribe(topic, ch)
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		go func(topic string, ch <-chan []byte) {
+			defer wg.Done()
+			select {
+			case msg := <-ch:
+				assert.Equal(t, "test", string(msg))
+			case <-time.After(1 * time.Second):
+				t.Errorf("timeout for topic: %s", topic)
+			}
+		}(topic, ch)
+
+		time.Sleep(10 * time.Millisecond)
+		err := ps.Memory.Publish(topic, []byte("test"))
+		assert.NoError(t, err)
+
+		wg.Wait()
+	}
+}
+
+func TestPubSub_MessageOrdering(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topic := "ordering-test"
+	ch := ps.Memory.Subscribe(topic)
+	defer ps.Memory.Unsubscribe(topic, ch)
+
+	const numMessages = 100
+	var received []int
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < numMessages; i++ {
+			select {
+			case msg := <-ch:
+				var num int
+				fmt.Sscanf(string(msg), "%d", &num)
+				mu.Lock()
+				received = append(received, num)
+				mu.Unlock()
+			case <-time.After(5 * time.Second):
+				t.Error("timeout waiting for message")
+				return
+			}
+		}
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Send messages in order
+	for i := 0; i < numMessages; i++ {
+		err := ps.Memory.Publish(topic, []byte(fmt.Sprintf("%d", i)))
+		assert.NoError(t, err)
+	}
+
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, numMessages, len(received))
+	
+	// Check ordering
+	for i := 0; i < numMessages; i++ {
+		assert.Equal(t, i, received[i])
+	}
+}
+
+func TestPubSub_SlowSubscriber(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topic := "slow-subscriber"
+	ch := ps.Memory.Subscribe(topic)
+	defer ps.Memory.Unsubscribe(topic, ch)
+
+	var received int64
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	// Slow subscriber
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			select {
+			case <-ch:
+				atomic.AddInt64(&received, 1)
+				time.Sleep(100 * time.Millisecond) // Slow processing
+			case <-time.After(5 * time.Second):
+				return
+			}
+		}
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Fast publisher
+	for i := 0; i < 10; i++ {
+		err := ps.Memory.Publish(topic, []byte(fmt.Sprintf("msg-%d", i)))
+		assert.NoError(t, err)
+	}
+
+	wg.Wait()
+
+	assert.Equal(t, int64(10), atomic.LoadInt64(&received))
+}
+
+func TestPubSub_EmptyMessage(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topic := "empty-msg"
+	ch := ps.Memory.Subscribe(topic)
+	defer ps.Memory.Unsubscribe(topic, ch)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		select {
+		case msg := <-ch:
+			assert.Equal(t, 0, len(msg))
+		case <-time.After(1 * time.Second):
+			t.Error("timeout waiting for empty message")
+		}
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	err = ps.Memory.Publish(topic, []byte{})
+	assert.NoError(t, err)
+
+	wg.Wait()
+}
+
+func TestPubSub_LargeMessage(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topic := "large-msg"
+	ch := ps.Memory.Subscribe(topic)
+	defer ps.Memory.Unsubscribe(topic, ch)
+
+	// Create 10MB message
+	largeMsg := make([]byte, 10*1024*1024)
+	for i := range largeMsg {
+		largeMsg[i] = byte(i % 256)
+	}
+
+	var received []byte
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		select {
+		case msg := <-ch:
+			received = make([]byte, len(msg))
+			copy(received, msg)
+		case <-time.After(5 * time.Second):
+			t.Error("timeout waiting for large message")
+		}
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	err = ps.Memory.Publish(topic, largeMsg)
+	assert.NoError(t, err)
+
+	wg.Wait()
+
+	assert.Equal(t, len(largeMsg), len(received))
+	assert.Equal(t, largeMsg, received)
+}
+
+func TestPubSub_SubscriberDisconnection(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topic := "disconnect-test"
+	ch1 := ps.Memory.Subscribe(topic)
+	ch2 := ps.Memory.Subscribe(topic)
+
+	var received1, received2 int64
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	// Subscriber 1
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			select {
+			case <-ch1:
+				atomic.AddInt64(&received1, 1)
+			case <-time.After(1 * time.Second):
+				return
+			}
+		}
+	}()
+
+	// Subscriber 2 - disconnects early
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 2; i++ {
+			select {
+			case <-ch2:
+				atomic.AddInt64(&received2, 1)
+			case <-time.After(1 * time.Second):
+				return
+			}
+		}
+		// Disconnect early
+		ps.Memory.Unsubscribe(topic, ch2)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Send messages
+	for i := 0; i < 5; i++ {
+		err := ps.Memory.Publish(topic, []byte(fmt.Sprintf("msg-%d", i)))
+		assert.NoError(t, err)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	wg.Wait()
+
+	assert.Equal(t, int64(5), atomic.LoadInt64(&received1))
+	assert.True(t, atomic.LoadInt64(&received2) <= 2)
+}
+
+func TestPubSub_NoSubscribers(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	topic := "no-subscribers"
+
+	// Publish to topic with no subscribers
+	err = ps.Memory.Publish(topic, []byte("orphan message"))
+	assert.NoError(t, err) // Should not error
+
+	// Subscribe after publishing
+	ch := ps.Memory.Subscribe(topic)
+	defer ps.Memory.Unsubscribe(topic, ch)
+
+	// Should not receive the previous message
+	select {
+	case <-ch:
+		t.Error("should not receive message published before subscription")
+	case <-time.After(100 * time.Millisecond):
+		// Expected - no message received
+	}
+}
+
+// ========== STRESS TESTS ==========
+
+func TestPubSub_StressTestManyTopics(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	const numTopics = 1000
+	var wg sync.WaitGroup
+	wg.Add(numTopics)
+
+	for i := 0; i < numTopics; i++ {
+		topic := fmt.Sprintf("topic-%d", i)
+		ch := ps.Memory.Subscribe(topic)
+		defer ps.Memory.Unsubscribe(topic, ch)
+
+		go func(topic string, ch <-chan []byte) {
+			defer wg.Done()
+			select {
+			case msg := <-ch:
+				assert.Equal(t, "test", string(msg))
+			case <-time.After(5 * time.Second):
+				t.Errorf("timeout for topic: %s", topic)
+			}
+		}(topic, ch)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Publish to all topics
+	for i := 0; i < numTopics; i++ {
+		topic := fmt.Sprintf("topic-%d", i)
+		err := ps.Memory.Publish(topic, []byte("test"))
+		assert.NoError(t, err)
+	}
+
+	wg.Wait()
+}
+
+func TestTaskQueue_StressTestManyQueues(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	const numQueues = 100
+	const tasksPerQueue = 10
+	var processed int64
+
+	// Register workers for all queues
+	for i := 0; i < numQueues; i++ {
+		queueName := fmt.Sprintf("queue-%d", i)
+		err := q.RegisterWorker(queueName, func(msg []byte) error {
+			atomic.AddInt64(&processed, 1)
+			return nil
+		})
+		assert.NoError(t, err)
+	}
+
+	// Enqueue tasks
+	for i := 0; i < numQueues; i++ {
+		queueName := fmt.Sprintf("queue-%d", i)
+		for j := 0; j < tasksPerQueue; j++ {
+			err := q.Enqueue(queueName, []byte(fmt.Sprintf("task-%d", j)))
+			assert.NoError(t, err)
+		}
+	}
+
+	// Wait for processing
+	timeout := time.After(10 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	expectedTotal := int64(numQueues * tasksPerQueue)
+	for {
+		select {
+		case <-timeout:
+			t.Fatalf("timeout: only processed %d out of %d tasks", atomic.LoadInt64(&processed), expectedTotal)
+		case <-ticker.C:
+			if atomic.LoadInt64(&processed) >= expectedTotal {
+				return
+			}
+		}
+	}
+}
+
+// ========== INTEGRATION TESTS ==========
+
+func TestIntegration_PubSubWithTaskQueue(t *testing.T) {
+	ps, err := pubsub.NewEngine()
+	assert.NoError(t, err)
+
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var processedTasks int64
+	var receivedEvents int64
+
+	// Setup task queue
+	err = q.RegisterWorker("email", func(msg []byte) error {
+		atomic.AddInt64(&processedTasks, 1)
+		// Publish event after processing
+		return ps.Memory.Publish("email.sent", []byte("email processed"))
+	})
+	assert.NoError(t, err)
+
+	// Setup event subscriber
+	ch := ps.Memory.Subscribe("email.sent")
+	defer ps.Memory.Unsubscribe("email.sent", ch)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			select {
+			case <-ch:
+				atomic.AddInt64(&receivedEvents, 1)
+			case <-time.After(2 * time.Second):
+				return
+			}
+		}
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Send tasks
+	for i := 0; i < 5; i++ {
+		err := q.Enqueue("email", []byte(fmt.Sprintf("email-%d", i)))
+		assert.NoError(t, err)
+	}
+
+	wg.Wait()
+
+	assert.Equal(t, int64(5), atomic.LoadInt64(&processedTasks))
+	assert.Equal(t, int64(5), atomic.LoadInt64(&receivedEvents))
+}
+
+func TestIntegration_ChainedQueues(t *testing.T) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var stage1Count, stage2Count, stage3Count int64
+
+	// Stage 1: Process input
+	err := q.RegisterWorker("stage1", func(msg []byte) error {
+		atomic.AddInt64(&stage1Count, 1)
+		// Forward to stage 2
+		return q.Enqueue("stage2", append([]byte("processed-"), msg...))
+	})
+	assert.NoError(t, err)
+
+	// Stage 2: Transform data
+	err = q.RegisterWorker("stage2", func(msg []byte) error {
+		atomic.AddInt64(&stage2Count, 1)
+		// Forward to stage 3
+		return q.Enqueue("stage3", append([]byte("transformed-"), msg...))
+	})
+	assert.NoError(t, err)
+
+	// Stage 3: Final processing
+	err = q.RegisterWorker("stage3", func(msg []byte) error {
+		atomic.AddInt64(&stage3Count, 1)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// Send initial data
+	for i := 0; i < 10; i++ {
+		err := q.Enqueue("stage1", []byte(fmt.Sprintf("data-%d", i)))
+		assert.NoError(t, err)
+	}
+
+	// Wait for processing
+	timeout := time.After(5 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for chained processing")
+		case <-ticker.C:
+			if atomic.LoadInt64(&stage3Count) >= 10 {
+				assert.Equal(t, int64(10), atomic.LoadInt64(&stage1Count))
+				assert.Equal(t, int64(10), atomic.LoadInt64(&stage2Count))
+				assert.Equal(t, int64(10), atomic.LoadInt64(&stage3Count))
+				return
+			}
+		}
+	}
+}
+
+
+
+func BenchmarkTaskQueue_Parallel(b *testing.B) {
+	q := queue.NewInMem()
+	q.AllowMultipleWorkers = true
+	defer q.Close()
+
+	var counter int64
+	_ = q.RegisterWorker("parallel", func(data []byte) error {
+		atomic.AddInt64(&counter, 1)
+		return nil
+	})
+
+	b.ResetTimer()
+	b.SetParallelism(8) // Uji dengan 8 thread paralel
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = q.Enqueue("parallel", []byte("msg"))
+		}
+	})
+}
+
+
+func BenchmarkTaskQueue_DelayRetry(b *testing.B) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	var success int64
+
+	_ = q.RegisterWorker("delay-retry", func(data []byte) error {
+		time.Sleep(50 * time.Microsecond) // simulate delay
+		if rand.Intn(10) < 3 {            // simulate 30% error rate
+			return errors.New("simulated error")
+		}
+		atomic.AddInt64(&success, 1)
+		return nil
+	})
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = q.Enqueue("delay-retry", []byte("msg"))
+	}
+}
+
+
+func BenchmarkTaskQueue_WorkerPool(b *testing.B) {
+	q := queue.NewInMem()
+	q.AllowMultipleWorkers = true
+	defer q.Close()
+
+	var wg sync.WaitGroup
+	workers := 16
+	wg.Add(b.N)
+
+	for i := 0; i < workers; i++ {
+		_ = q.RegisterWorker("pool", func(data []byte) error {
+			wg.Done()
+			return nil
+		})
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = q.Enqueue("pool", []byte("task"))
+	}
+
+	wg.Wait()
+}
+
+
+func BenchmarkTaskQueue_RateLimit(b *testing.B) {
+	q := queue.NewInMem()
+	defer q.Close()
+
+	limiter := time.Tick(100 * time.Microsecond) // ~10.000 msg/sec
+	done := make(chan bool, b.N)
+
+	_ = q.RegisterWorker("rate", func(data []byte) error {
+		<-limiter // block sesuai rate
+		done <- true
+		return nil
+	})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = q.Enqueue("rate", []byte("msg"))
+	}
+
+	for i := 0; i < b.N; i++ {
+		<-done
+	}
 }
