@@ -74,7 +74,7 @@ func (r *Route) Named(name string) *Route {
 }
 
 func AddRoute(app RouterApp, methods []string, path string, handler Handler, handlers ...Handler) *Route {
-	baseHandlers := append([]Handler{handler}, handlers...)	
+	baseHandlers := append([]Handler{handler}, handlers...)
 	middleware := app.GetMiddleware()
 
 	route := &Route{
@@ -88,12 +88,12 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 	app.SetRoutes(append(app.GetRoutes(), route))
 	for _, method := range methods {
 		route.Method = method
-	
+
 		app.GetRouter().Handle(method, path, app.WrapHandlers([]Handler{
 			func(c *Context) {
 				handlers := append(middleware, baseHandlers...)
-	
-				if (method == "GET" || route.Options.force )&& !route.Options.disable {
+
+				if (method == "GET" || route.Options.force) && !route.Options.disable {
 					ttl := 5 * time.Minute
 					if route.Options.ttl != nil {
 						ttl = *route.Options.ttl
@@ -102,8 +102,7 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 				} else {
 					Log.Debug("[CACHE] DISABLED: %s %s", method, path)
 				}
-				
-				
+
 				for _, h := range handlers {
 					h(c)
 					if c.aborted {
@@ -114,10 +113,9 @@ func AddRoute(app RouterApp, methods []string, path string, handler Handler, han
 			},
 		}))
 	}
-	
+
 	return route
 }
-
 
 func withCacheFull(method, path string, handlers []Handler, ttl time.Duration) []Handler {
 	cacheKey := fmt.Sprintf("cache:%s:%s", method, path)
@@ -162,11 +160,6 @@ func withCacheFull(method, path string, handlers []Handler, ttl time.Duration) [
 	return append([]Handler{read}, append(handlers, write)...)
 }
 
-
-
-
-
-
 func LoggerWrap(c *Context, handlers []Handler) {
 	if DisableLogger {
 		return
@@ -197,11 +190,11 @@ func LoggerWrap(c *Context, handlers []Handler) {
 	}
 
 	fmt.Printf("🚀 TurboGo [%s] → %-7s %-25s %s \n",
-			timestamp,
-			method,
-			path,
-			statusColor.Sprintf("[%3d]", status),
-		)	
+		timestamp,
+		method,
+		path,
+		statusColor.Sprintf("[%3d]", status),
+	)
 }
 
 // ==================== GROUP ====================

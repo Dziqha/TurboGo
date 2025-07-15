@@ -22,23 +22,23 @@ func NewInMem() *InMemCache {
 		store: make(map[string]entry),
 		done:  make(chan struct{}),
 	}
-	
+
 	r.cleaner = time.NewTicker(time.Minute)
 	go r.cleanup()
-	
+
 	return r
 }
 
 func (r *InMemCache) Set(key string, value []byte, ttl time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	var expiresAt *time.Time
 	if ttl > 0 {
 		expiry := time.Now().Add(ttl)
 		expiresAt = &expiry
 	}
-	
+
 	r.store[key] = entry{
 		Value:     value,
 		ExpiresAt: expiresAt,
@@ -48,12 +48,12 @@ func (r *InMemCache) Set(key string, value []byte, ttl time.Duration) {
 func (r *InMemCache) Get(key string) ([]byte, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	e, ok := r.store[key]
 	if !ok {
 		return nil, false
 	}
-	
+
 	if e.ExpiresAt != nil && time.Now().After(*e.ExpiresAt) {
 		go func() {
 			r.mu.Lock()
@@ -62,14 +62,14 @@ func (r *InMemCache) Get(key string) ([]byte, bool) {
 		}()
 		return nil, false
 	}
-	
+
 	return e.Value, true
 }
 
 func (r *InMemCache) Delete(key string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	_, ok := r.store[key]
 	if ok {
 		delete(r.store, key)
@@ -89,19 +89,19 @@ func (r *InMemCache) SetEx(key string, value []byte, seconds int) {
 func (r *InMemCache) SetNX(key string, value []byte, ttl time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if e, ok := r.store[key]; ok {
 		if e.ExpiresAt == nil || time.Now().Before(*e.ExpiresAt) {
 			return false
 		}
 	}
-	
+
 	var expiresAt *time.Time
 	if ttl > 0 {
 		expiry := time.Now().Add(ttl)
 		expiresAt = &expiry
 	}
-	
+
 	r.store[key] = entry{
 		Value:     value,
 		ExpiresAt: expiresAt,
@@ -123,7 +123,7 @@ func (r *InMemCache) cleanup() {
 func (r *InMemCache) cleanupExpired() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	now := time.Now()
 	for key, entry := range r.store {
 		if entry.ExpiresAt != nil && now.After(*entry.ExpiresAt) {
@@ -137,7 +137,7 @@ func (r *InMemCache) Close() {
 	if r.cleaner != nil {
 		r.cleaner.Stop()
 	}
-	
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.store = make(map[string]entry)
@@ -148,7 +148,6 @@ func (r *InMemCache) Size() int {
 	defer r.mu.RUnlock()
 	return len(r.store)
 }
-
 
 func (r *InMemCache) TTL(key string) time.Duration {
 	r.mu.RLock()
@@ -171,7 +170,6 @@ func (r *InMemCache) TTL(key string) time.Duration {
 	return ttl
 }
 
-
 func (r *InMemCache) Range(fn func(key string, value []byte)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -179,4 +177,3 @@ func (r *InMemCache) Range(fn func(key string, value []byte)) {
 		fn(k, v.Value)
 	}
 }
-

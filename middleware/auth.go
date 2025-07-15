@@ -44,7 +44,7 @@ func AuthJWT(secret string) core.Handler {
 			for _, v := range claims {
 				if str, ok := v.(string); ok {
 					c.SetSession("user", str)
-					break 
+					break
 				}
 			}
 		}

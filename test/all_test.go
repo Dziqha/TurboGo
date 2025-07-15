@@ -116,7 +116,7 @@ func TestTaskQueue_Close(t *testing.T) {
 
 	var called bool
 	var mu sync.Mutex
-	
+
 	err := q.RegisterWorker("shutdown", func(msg []byte) error {
 		mu.Lock()
 		called = true
@@ -264,7 +264,7 @@ func TestPubSub_SubscribeRaw(t *testing.T) {
 
 	// Beri sedikit delay untuk memastikan subscriber ready
 	time.Sleep(10 * time.Millisecond)
-	
+
 	err = ps.Memory.Publish("raw", []byte("raw data"))
 	assert.NoError(t, err)
 
@@ -396,10 +396,10 @@ func TestEventBus_UnsubscribeAll(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		ps.Subscribe("group")
 	}
-	
+
 	// Beri waktu untuk subscriber register
 	time.Sleep(10 * time.Millisecond)
-	
+
 	ps.UnsubscribeAll("group")
 
 	assert.Equal(t, 0, ps.GetSubscriberCount("group"))
@@ -426,7 +426,7 @@ func BenchmarkPubSub_1000Messages(b *testing.B) {
 
 	// Worker goroutine untuk consume messages
 	go func() {
-		sub := ps.Memory.Subscribe("bench") 
+		sub := ps.Memory.Subscribe("bench")
 		ready <- true // signal subscriber is ready
 
 		count := 0
@@ -567,8 +567,6 @@ func TestTaskQueue_RealTimeHandler(t *testing.T) {
 	assert.ElementsMatch(t, []string{"task-1", "task-2", "task-3"}, result)
 	mu.Unlock()
 }
-
-
 
 func BenchmarkTaskQueue_CPUProfile(b *testing.B) {
 	q := queue.NewInMem()
@@ -862,7 +860,7 @@ func TestPubSub_TopicWithSpecialCharacters(t *testing.T) {
 		"topic@with@at",
 		"topic with spaces",
 		"topic#with#hash",
-		"数据库更新", // Chinese characters
+		"数据库更新",               // Chinese characters
 		"пользователь_создан", // Cyrillic
 	}
 
@@ -936,7 +934,7 @@ func TestPubSub_MessageOrdering(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	assert.Equal(t, numMessages, len(received))
-	
+
 	// Check ordering
 	for i := 0; i < numMessages; i++ {
 		assert.Equal(t, i, received[i])
@@ -1321,8 +1319,6 @@ func TestIntegration_ChainedQueues(t *testing.T) {
 	}
 }
 
-
-
 func BenchmarkTaskQueue_Parallel(b *testing.B) {
 	q := queue.NewInMem()
 	q.AllowMultipleWorkers = true
@@ -1343,7 +1339,6 @@ func BenchmarkTaskQueue_Parallel(b *testing.B) {
 		}
 	})
 }
-
 
 func BenchmarkTaskQueue_DelayRetry(b *testing.B) {
 	q := queue.NewInMem()
@@ -1366,7 +1361,6 @@ func BenchmarkTaskQueue_DelayRetry(b *testing.B) {
 		_ = q.Enqueue("delay-retry", []byte("msg"))
 	}
 }
-
 
 func BenchmarkTaskQueue_WorkerPool(b *testing.B) {
 	q := queue.NewInMem()
@@ -1391,7 +1385,6 @@ func BenchmarkTaskQueue_WorkerPool(b *testing.B) {
 
 	wg.Wait()
 }
-
 
 func BenchmarkTaskQueue_RateLimit(b *testing.B) {
 	q := queue.NewInMem()

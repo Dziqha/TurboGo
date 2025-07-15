@@ -13,13 +13,12 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-
 type App struct {
 	routes     concurrency.SafeValue[[]*core.Route]
 	middleware concurrency.SafeValue[[]core.Handler]
 	router     *router.Router
 
-	cache *cache.Engine 
+	cache  *cache.Engine
 	pubsub *pubsub.Engine
 	queue  *queue.Engine
 }
@@ -37,7 +36,7 @@ func Banner(addr string) string {
                                                               
 ` + CenterText("High-Performance Web Framework for Go") + `
 ` + CenterText("Version: v1.0.0") + `                                                     
-` + CenterText(fmt.Sprintf("Listening on: http://localhost%s", addr)) +`                                                     
+` + CenterText(fmt.Sprintf("Listening on: http://localhost%s", addr)) + `                                                     
 `
 }
 
@@ -46,7 +45,6 @@ func CenterText(text string, addr ...string) string {
 	padding := (maxLineLength - textLen) / 2
 	return strings.Repeat(" ", padding) + text
 }
-
 
 func New() *App {
 	cacheEngine, err := cache.NewEngine()
@@ -125,7 +123,6 @@ func (a *App) RunServer(addr string) error {
 	return fasthttp.ListenAndServe(addr, a.router.Handler)
 }
 
-
 func (a *App) InitEmptyEngine() *core.EngineContext {
 	return &core.EngineContext{}
 }
@@ -147,7 +144,6 @@ func (a *App) WithPubsub(ctx *core.EngineContext) {
 	ctx.Pubsub = ps
 	a.pubsub = ps
 }
-
 
 // HTTP Methods
 func (a *App) Get(path string, h core.Handler, hs ...core.Handler) *core.Route {

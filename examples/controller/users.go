@@ -58,11 +58,9 @@ func OnUserCreated(data []byte) error {
 	return nil
 }
 
-
 func Quehandler(q *core.EngineContext) {
 	q.Queue.RegisterWorkerAll("user:welcome-email", SendWelcomeEmailWorker)
 }
-
 
 func PubsubHandler(ps *core.EngineContext) {
 	ch := ps.Pubsub.SubscribeAll("user.created")

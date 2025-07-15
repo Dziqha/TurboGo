@@ -1,12 +1,9 @@
 package queue
 
-
 type Engine struct {
-	Memory *TaskQueue
+	Memory  *TaskQueue
 	Storage *PersistentTaskQueue
 }
-
-
 
 func NewEngine() (*Engine, error) {
 	persist, err := NewPersistent("data/queue.json")
@@ -19,7 +16,6 @@ func NewEngine() (*Engine, error) {
 	}, nil
 }
 
-
 func (e *Engine) EnqueueAll(queue string, task []byte) error {
 	if err := e.Storage.Enqueue(queue, task); err != nil {
 		return err
@@ -29,7 +25,6 @@ func (e *Engine) EnqueueAll(queue string, task []byte) error {
 	}
 	return nil
 }
-
 
 func (q *Engine) RegisterWorkerAll(queueName string, handler func([]byte) error) {
 	q.Memory.RegisterWorker(queueName, handler)

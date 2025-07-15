@@ -5,6 +5,7 @@ import (
 
 	"github.com/Dziqha/TurboGo/core"
 )
+
 type HandlerController struct{}
 
 func NewHandlerController() *HandlerController {

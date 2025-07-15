@@ -1,11 +1,12 @@
 package concurrency
 
 import "sync"
+
 func Async(fn func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				
+
 				panic(r)
 			}
 		}()

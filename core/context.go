@@ -12,22 +12,20 @@ import (
 )
 
 type Context struct {
-	Ctx   *fasthttp.RequestCtx
-	Cache *cache.Engine
-	Pubsub *pubsub.Engine
-	Queue *queue.Engine
+	Ctx      *fasthttp.RequestCtx
+	Cache    *cache.Engine
+	Pubsub   *pubsub.Engine
+	Queue    *queue.Engine
 	index    int
 	handlers []Handler
-	aborted bool
-	values map[string]any
-
+	aborted  bool
+	values   map[string]any
 }
 
 type EngineContext struct {
 	Pubsub *pubsub.Engine
-    Queue *queue.Engine
+	Queue  *queue.Engine
 }
-
 
 func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handler) *Context {
 	return &Context{
@@ -37,7 +35,6 @@ func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handle
 		index:    -1, // ⬅️  agar Next() mulai dari 0
 	}
 }
-
 
 // JSON writes a JSON response
 func (c *Context) JSON(status int, data any) {
@@ -52,8 +49,6 @@ func (c *Context) JSON(status int, data any) {
 	}
 	c.Ctx.SetBody(res)
 }
-
-
 
 // Text writes a plain text response
 func (c *Context) Text(code int, msg string) {
@@ -83,7 +78,7 @@ func (c *Context) BindJSON(dest any) error {
 }
 
 func (c *Context) Header(key string) string {
-    return string(c.Ctx.Request.Header.Peek(key))
+	return string(c.Ctx.Request.Header.Peek(key))
 }
 
 func (c *Context) Next() {
@@ -101,7 +96,6 @@ func (c *Context) Aborted() bool {
 	return c.aborted
 }
 
-
 // Async menjalankan fungsi dalam goroutine tanpa block
 func (c *Context) Async(fn func()) {
 	concurrency.Async(fn)
@@ -111,7 +105,6 @@ func (c *Context) Async(fn func()) {
 func (c *Context) Parallel(funcs ...func()) {
 	concurrency.WaitGroupRunner(funcs...)
 }
-
 
 func (c *Context) SetSession(key string, value any) {
 	if c.values == nil {
@@ -125,14 +118,13 @@ func (c *Context) GetSession(key string) any {
 		return nil
 	}
 	if val, ok := c.values[key]; ok {
-		if str, ok := val.(string);  ok {
-			return  str
+		if str, ok := val.(string); ok {
+			return str
 		}
 	}
 
-	return  ""
+	return ""
 }
-
 
 func (c *Context) MustPubsub() *pubsub.Engine {
 	if c.Pubsub == nil {
@@ -148,7 +140,6 @@ func (c *Context) MustQueue() *queue.Engine {
 	return c.Queue
 }
 
-
 func (c *Context) SetQueue(q *queue.Engine) {
 	c.Queue = q
 }
@@ -156,6 +147,3 @@ func (c *Context) SetQueue(q *queue.Engine) {
 func (c *Context) SetPubsub(p *pubsub.Engine) {
 	c.Pubsub = p
 }
-
-
-

@@ -9,6 +9,7 @@ import (
 )
 
 type LogLevel string
+
 var DisableLogger bool
 
 const (

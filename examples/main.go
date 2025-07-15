@@ -25,9 +25,9 @@ func PublicHandler(c *core.Context) {
 		"time":    time.Now().Format(time.RFC3339), // untuk bukti cache HIT tidak berubah
 	})
 }
-func CobaPost(c *core.Context){
-	c.JSON(200,map[string]any{
-		"message":"coba post",
+func CobaPost(c *core.Context) {
+	c.JSON(200, map[string]any{
+		"message": "coba post",
 	})
 }
 func PrivateHandler(c *core.Context) {
@@ -58,7 +58,6 @@ func HapusCacheHandler(c *core.Context) {
 	})
 }
 
-
 func HeavyHandler(c *core.Context) {
 	start := time.Now()
 	time.Sleep(2 * time.Second) // Simulasi kerja berat
@@ -86,7 +85,6 @@ func AuthHandler(c *core.Context) {
 		"user":    user,
 	})
 }
-
 
 func LoginHandler(c *core.Context) {
 	// Ambil username dari form (bisa pakai JSON parsing kalau mau)
@@ -117,15 +115,13 @@ func LoginHandler(c *core.Context) {
 	})
 }
 
-
 func main() {
 	app := TurboGo.New()
 	core.DisableLogger = true
 	secret := "supersecurekey123"
 	app.Use(
-		middleware.Recover(), 
-		
-	)	
+		middleware.Recover(),
+	)
 
 	// controller := controller.NewHandlerController()
 	// data.NewRouter(
@@ -156,7 +152,7 @@ func main() {
 	// 		}
 	// 	}
 	// }()
-	
+
 	// go func() {
 	// 	ch := ps.Storage.Subscribe("user.created")
 	// 	for msg := range ch {
@@ -169,8 +165,6 @@ func main() {
 
 	controller.Quehandler(ctx)
 	go controller.PubsubHandler(ctx)
-
-	
 
 	auth := app.Group("/api", middleware.AuthJWT(secret))
 	app.Post("/login", LoginHandler)
@@ -187,21 +181,21 @@ func main() {
 	// ⚠️ POST normally no-cache, tapi bisa di-cache pakai .Cache()
 	app.Post("/heavy", HeavyHandler).Cache(5 * time.Second)
 	app.Handler()
-	
+
 	app.Get("/hello", func(c *core.Context) {
 
 		c.Text(200, "Hello TurboGo!")
 	}).NoCache()
-	
+
 	app.Get("/test-redis", func(c *core.Context) {
 		c.Cache.Memory.Set("test", []byte("TurboGo"), 10*time.Second)
-	
+
 		val, _ := c.Cache.Memory.Get("test")
 		if val == nil {
 			c.JSON(404, map[string]string{"error": "not found"})
 			return
 		}
-	
+
 		c.JSON(200, map[string]string{
 			"cache_value": string(val),
 		})
@@ -210,8 +204,8 @@ func main() {
 	app.Get("/ttl/:key", func(c *core.Context) {
 		key := c.Param("key")
 		ttl := c.Cache.Memory.TTL(key)
-	
-		switch  ttl{
+
+		switch ttl {
 		case -2 * time.Second:
 			c.JSON(404, map[string]string{"error": "key not found or expired"})
 		case -1 * time.Second:
@@ -220,13 +214,12 @@ func main() {
 			c.JSON(200, map[string]string{"ttl": ttl.String()})
 		}
 	})
-	
-	
+
 	app.Get("/debug/routes", func(c *core.Context) {
 		routes := app.RoutesInfo()
 		c.JSON(200, routes)
 	}).Named("routes")
-	
+
 	app.Get("/debug/redis/keys", func(c *core.Context) {
 		keys := make([]string, 0)
 		c.Cache.Memory.Range(func(k string, _ []byte) {
@@ -234,7 +227,6 @@ func main() {
 		})
 		c.JSON(200, keys)
 	})
-	
 
 	app.RunServer(":8080")
 }

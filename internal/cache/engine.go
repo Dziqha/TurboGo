@@ -1,11 +1,11 @@
 package cache
 
 type Engine struct {
-	Memory  *InMemCache  // from inmem.go
+	Memory *InMemCache // from inmem.go
 }
 
 func NewEngine() (*Engine, error) {
 	return &Engine{
-		Memory:  NewInMem(),
+		Memory: NewInMem(),
 	}, nil
 }

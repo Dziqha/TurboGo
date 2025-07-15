@@ -1,11 +1,9 @@
 package pubsub
 
-
 type Engine struct {
 	Memory  *EventBus
 	Storage *PersistentEventBus
 }
-
 
 func NewEngine() (*Engine, error) {
 	persist, err := NewPersistent("data/pubsub.json")
@@ -18,7 +16,6 @@ func NewEngine() (*Engine, error) {
 	}, nil
 }
 
-
 func (e *Engine) PublishAll(topic string, data []byte) error {
 	if err := e.Storage.Publish(topic, data); err != nil {
 		return err
@@ -28,7 +25,6 @@ func (e *Engine) PublishAll(topic string, data []byte) error {
 	}
 	return nil
 }
-
 
 func (p *Engine) SubscribeAll(topic string) <-chan []byte {
 	memCh := p.Memory.Subscribe(topic)

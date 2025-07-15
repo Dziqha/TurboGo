@@ -109,13 +109,10 @@ func safeHandler(handler func([]byte) error) func([]byte) error {
 	}
 }
 
-
-
-
 func (q *TaskQueue) GetQueueSize(queue string) int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	if ch, ok := q.queues[queue]; ok {
 		return len(ch)
 	}
@@ -125,7 +122,7 @@ func (q *TaskQueue) GetQueueSize(queue string) int {
 func (q *TaskQueue) GetQueues() []string {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	queues := make([]string, 0, len(q.queues))
 	for name := range q.queues {
 		queues = append(queues, name)
@@ -136,16 +133,16 @@ func (q *TaskQueue) GetQueues() []string {
 func (q *TaskQueue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	q.closed = true
-	
+
 	for queue, cancels := range q.workers {
 		for _, cancel := range cancels {
 			cancel()
 		}
 		delete(q.workers, queue)
 	}
-	
+
 	for queue, ch := range q.queues {
 		close(ch)
 		delete(q.queues, queue)
