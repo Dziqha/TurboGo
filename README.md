@@ -2,6 +2,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.24-blue)](https://go.dev)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
+[![Go Report Card](https://goreportcard.com/badge/github.com/Dziqha/TurboGo)](https://goreportcard.com/report/github.com/Dziqha/TurboGo)
 [![Coverage](https://img.shields.io/badge/Coverage-ComingSoon-yellow)]()
 [![Contributions](https://img.shields.io/badge/Contributions-welcome-blueviolet)](https://github.com/Dziqha/TurboGo/discussions)
 [![License](https://img.shields.io/github/license/Dziqha/TurboGo)](./LICENSE)
@@ -12,7 +13,7 @@
 
 **TurboGo Key Features are :**
 
-- Middleware-first — use `.Use()` like Express.js
+- Middleware-first — use `.Use()`
 - Ultra-fast router & context engine
 - Built-in async engines (PubSub, Queue, Cache)
 - Extensible and clean internal architecture
