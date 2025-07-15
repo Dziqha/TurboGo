@@ -32,9 +32,8 @@ jobs:
       - name: Get commit type
         id: commit
         run: |
-          TYPE=$(git log -1 --pretty=%s | grep -oE '^(feat|fix|chore|docs|refactor|ci|test)(?=:)')
+          TYPE=$(git log -1 --pretty=%s | sed -E 's/^([a-z]+):.*/\1/' | grep -E '^(feat|fix|chore|docs|refactor|ci|test)$' || echo "other")
           echo "type=$TYPE" >> $GITHUB_OUTPUT
-
       - name: Create tag and push
         run: |
           git tag ${{ steps.bump.outputs.new_tag }}
