@@ -42,6 +42,7 @@ jobs:
             echo "type=patch" >> $GITHUB_OUTPUT
           else
             echo "type=patch" >> $GITHUB_OUTPUT
+          fi
 
       - name: Bump version (safe fallback)
         id: bump
