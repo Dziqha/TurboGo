@@ -15,25 +15,27 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-const maxLineLength = 60
+const maxLineLength = 50
 
 func CenterText(text string) string {
 	textLen := len(text)
+	if textLen >= maxLineLength {
+		return text
+	}
 	padding := (maxLineLength - textLen) / 2
 	return strings.Repeat(" ", padding) + text
 }
 
 func Banner(addr string) string {
 	return `
- ████████╗██╗   ██╗██████╗ ██████╗  ██████╗  ██████╗  ██████╗ 
- ╚══██╔══╝██║   ██║██╔══██╗██╔══██╗██╔═══██╗██╔════╝ ██╔═══██╗
-    ██║   ██║   ██║██████╔╝██████╔╝██║   ██║██║  ███╗██║   ██║
-    ██║   ██║   ██║██╔══██╗██╔══██╗██║   ██║██║   ██║██║   ██║
-    ██║   ╚██████╔╝██║  ██║██████╔╝╚██████╔╝╚██████╔╝╚██████╔╝
-    ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚═════╝  ╚═════╝ 
+ _____            _             ___      
+/__   \_   _ _ __| |__   ___   / _ \___  
+  / /\/ | | | '__| '_ \ / _ \ / /_\/ _ \ 
+ / /  | |_| | |  | |_) | (_) / /_\\ (_) |
+ \/    \__,_|_|  |_.__/ \___/\____/\___/ 
+                                         
 ` +
 		CenterText("🌀 TurboGo Ultra High-Performance Web Framework") + "\n" +
-		CenterText("Version: v3.0.0 - Memory Optimized Edition") + "\n" +
 		CenterText(fmt.Sprintf("⚡ Listening on: http://localhost%s", addr)) + "\n"
 }
 
@@ -144,7 +146,6 @@ func (a *App) Route(path string) *router.Route {
 func (a *App) RunServer(addr string) error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	fmt.Println(Banner(addr))
-	fmt.Printf("🔥 Using %d CPU cores\n", runtime.NumCPU())
 	return fasthttp.ListenAndServe(addr, a.Handler())
 }
 

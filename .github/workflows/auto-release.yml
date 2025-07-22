@@ -81,15 +81,8 @@ jobs:
       - name: Generate changelog from .changelog.md
         id: changelog
         run: |
-          CURR_TAG=${{ steps.bump.outputs.new_tag }}
-          
-          echo "${CURR_TAG}" > changelog.txt
-          echo "" >> changelog.txt
-          
           # Check if .changelog.md exists and add its content
           if [ -f ".changelog.md" ]; then
-            echo "📋 Release Notes" >> changelog.txt
-            echo "" >> changelog.txt
             cat .changelog.md >> changelog.txt
           else
             echo "⚠️ No .changelog.md file found" >> changelog.txt
@@ -97,59 +90,77 @@ jobs:
             echo "🧹 Updates" >> changelog.txt
             echo "- Release created without changelog file" >> changelog.txt
           fi
+          echo " " >> changelog.txt
+          echo " ### ✍️ Commits by: " >> changelog.txt
+      
+      - name: Generate changelog with PR info
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          PREV_TAG=$(git tag | sort -V | tail -n2 | head -n1)
+          CURR_TAG=${{ steps.bump.outputs.new_tag }}
 
-      - name: Add contributors to changelog
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log $PREV_TAG..HEAD --pretty=format:"%H|%s|%an")
+          else
+            COMMITS=$(git log --pretty=format:"%H|%s|%an")
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            echo "- No commits found." >> changelog.txt
+          fi
+
+          while IFS="|" read -r HASH MESSAGE AUTHOR; do
+            # Skip empty commit messages
+            [ -z "$MESSAGE" ] && continue
+
+            PR_INFO=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/search/issues?q=$HASH+repo:$REPO")
+            PR_NUMBER=$(echo "$PR_INFO" | jq -r '.items[0].number // empty')
+            PR_USER=$(echo "$PR_INFO" | jq -r '.items[0].user.login // empty')
+
+            if [ -n "$PR_NUMBER" ] && [ -n "$PR_USER" ]; then
+              echo "- $MESSAGE by @$PR_USER in #$PR_NUMBER" >> changelog.txt
+            elif [ -n "$AUTHOR" ]; then
+              echo "- $MESSAGE by @$AUTHOR in $HASH" >> changelog.txt
+            else
+              echo "- $MESSAGE in $HASH" >> changelog.txt
+            fi
+          done <<< "$COMMITS"
+      
+      - name: Resolve GitHub usernames
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
-          # Get previous tag for comparison
           PREV_TAG=$(git tag --sort=-creatordate | sed -n 2p)
-          
-          # Get unique contributors since last release
           if [ -n "$PREV_TAG" ]; then
-            AUTHORS=$(git log $PREV_TAG..HEAD --format='%ae|%an' | sort -u)
+            AUTHORS=$(git log $PREV_TAG..HEAD --format='%ae' | sort -u)
           else
-            AUTHORS=$(git log --format='%ae|%an' | sort -u)
+            AUTHORS=$(git log --format='%ae' | sort -u)
           fi
 
           CONTRIBUTORS=""
-          CONTRIBUTOR_COUNT=0
-          
-          # Process each author
-          while IFS="|" read -r EMAIL NAME; do
-            [ -z "$EMAIL" ] && continue
-            
-            # Try to get GitHub username from email
-            USER=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/search/users?q=$EMAIL+in:email" | \
-              jq -r '.items[0].login // empty')
-            
+          for EMAIL in $AUTHORS; do
+            USER=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/search/users?q=$EMAIL+in:email | jq -r '.items[0].login // empty')
             if [ -n "$USER" ]; then
-              CONTRIBUTORS+="- [@$USER](https://github.com/$USER)\n"
-            elif [ -n "$NAME" ]; then
-              CONTRIBUTORS+="- $NAME\n"
-            else
-              CONTRIBUTORS+="- $EMAIL\n"
+              CONTRIBUTORS+="[@$USER](https://github.com/$USER)\n"
             fi
-            CONTRIBUTOR_COUNT=$((CONTRIBUTOR_COUNT + 1))
-          done <<< "$AUTHORS"
+          done
 
-          # Add contributors section if we found any
-          if [ $CONTRIBUTOR_COUNT -gt 0 ]; then
+          if [ -n "$CONTRIBUTORS" ]; then
             echo "" >> changelog.txt
             echo "👥 Contributors" >> changelog.txt
-            echo "" >> changelog.txt
             echo -e "$CONTRIBUTORS" >> changelog.txt
-            echo "" >> changelog.txt
-            echo "*Thank you to all $CONTRIBUTOR_COUNT contributor(s) who made this release possible!*" >> changelog.txt
           fi
+
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.PERSONAL_TOKEN }}
           tag_name: ${{ steps.bump.outputs.new_tag }}
-          name: Release ${{ steps.bump.outputs.new_tag }}
+          name: TurboGo ${{ steps.bump.outputs.new_tag }}
           body_path: changelog.txt
 
       - name: Send Telegram Notification
