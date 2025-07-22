@@ -90,7 +90,7 @@ jobs:
           if [ -f ".catalog.md" ]; then
             echo "📋 Release Notes" >> changelog.txt
             echo "" >> changelog.txt
-            cat .catalog.md >> changelog.txt
+            cat .changelog.md >> changelog.txt
           else
             echo "⚠️ No .catalog.md file found" >> changelog.txt
             echo "" >> changelog.txt
