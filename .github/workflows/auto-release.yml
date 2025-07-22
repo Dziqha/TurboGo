@@ -78,7 +78,7 @@ jobs:
           git tag -f $MAJOR ${{ steps.bump.outputs.new_tag }}
           git push origin $MAJOR --force
 
-      - name: Generate changelog from .catalog.md
+      - name: Generate changelog from .changelog.md
         id: changelog
         run: |
           CURR_TAG=${{ steps.bump.outputs.new_tag }}
@@ -86,16 +86,16 @@ jobs:
           echo "${CURR_TAG}" > changelog.txt
           echo "" >> changelog.txt
           
-          # Check if .catalog.md exists and add its content
-          if [ -f ".catalog.md" ]; then
+          # Check if .changelog.md exists and add its content
+          if [ -f ".changelog.md" ]; then
             echo "📋 Release Notes" >> changelog.txt
             echo "" >> changelog.txt
             cat .changelog.md >> changelog.txt
           else
-            echo "⚠️ No .catalog.md file found" >> changelog.txt
+            echo "⚠️ No .changelog.md file found" >> changelog.txt
             echo "" >> changelog.txt
             echo "🧹 Updates" >> changelog.txt
-            echo "- Release created without catalog file" >> changelog.txt
+            echo "- Release created without changelog file" >> changelog.txt
           fi
 
       - name: Add contributors to changelog
