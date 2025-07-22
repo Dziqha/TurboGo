@@ -11,8 +11,9 @@ To run TurboGo in production environments, follow these steps:
 
 ##  Requirements
 
-- **Go 1.21+** is recommended
-- Ensure your app handles requests efficiently (TurboGo is built on `fasthttp`)
+- Go 1.23+ is recommended for the latest features and performance.
+
+- TurboGo is built on a custom engine based on fasthttp, designed for minimal allocations, high efficiency, and fast handler chaining.
 
 ---
 
@@ -61,11 +62,3 @@ Integrate with:
 - [**Prometheus**](https://prometheus.io/) for metrics
 - [**Grafana**](https://grafana.com/) for dashboards
 - Logging systems like [**Loki**](https://grafana.com/oss/loki/) or [**Logtail**](https://logtail.com/)
-
----
-
-## Tips
-
-- Enable recovery & logging middleware
-- Run with limited permissions
-- Monitor uptime and memory usage

@@ -9,23 +9,28 @@ TurboGo includes a built-in background job system for running asynchronous tasks
 
 ---
 
-##  Initialization
+## Initialization
 
-Initialize the queue system in your main function:
+Initialize the queue system in your `main.go`:
 
 ```go
-ctx := app.InitEmptyEngine()
-app.WithQueue(ctx)
-controller.QueueWorker(ctx)
+app := TurboGo.New().WithQueue()
+controller.Quehandler(app.EngineCtx)
 ```
+
+> ✅ You can also chain this with other modules:
+>
+> ```go
+> app := TurboGo.New().WithCache().WithPubsub().WithQueue()
+> ```
 
 ---
 
-##  How It Works
+## How It Works
 
-- Jobs are pushed using `Enqueue(topic, data)` to be processed later.
-- Each queue is identified by a topic string.
-- Workers process jobs from either memory, storage, or both.
+* Jobs are pushed using Enqueue(topic, data) to be processed later.
+* Each queue is identified by a topic string.
+* Workers process jobs from either memory, storage, or both.
 
 ---
 
@@ -79,12 +84,23 @@ c.Queue.RegisterWorkerAll("user:welcome-email", SendWelcomeEmailWorker)
 ### Worker example:
 
 ```go
+
 func SendWelcomeEmailWorker(data []byte) error {
 	var input CreateUserInput
-	json.Unmarshal(data, &input)
+	if err := json.Unmarshal(data, &input); err != nil {
+		return fmt.Errorf("invalid payload: %w", err)
+	}
 	fmt.Printf("👷 Queue Worker: %s <%s>\n", input.Name, input.Email)
 	return nil
 }
+
+func Quehandler(ctx *core.EngineContext) {
+	if ctx.Queue == nil {
+		panic("Queue engine not initialized")
+	}
+	ctx.Queue.RegisterWorkerAll("user:welcome-email", SendWelcomeEmailWorker)
+}
+
 ```
 
 ---

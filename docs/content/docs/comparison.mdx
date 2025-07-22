@@ -11,11 +11,15 @@ TurboGo is designed to deliver high performance with modern features built-in. H
 
 ##  Performance Summary
 
-Based on benchmark tests with 15,000 requests:
+Based on 3 rounds of benchmark tests using 🖥️ all 12 CPU cores, ⚡ Duration: 10s, and Concurrency levels [1, 5, 10, 25, 50]:
 
-- 🟢 **TurboGo** had the **fastest throughput**
-- 🟢 Lowest response time and memory usage
-- ✅ Consistent under high load
+* 🟢 TurboGo consistently achieved the highest throughput (RPS) across all tests
+
+* 🟢 Achieved lowest average response time, especially at high concurrency
+
+* ✅ Proven to be stable and reliable under high concurrency load
+
+* 🥇 TurboGo emerged as the top performer in every round
 
 > Detailed charts can be found in the [Benchmark section](/docs/benchmarks)
 
@@ -24,27 +28,19 @@ Based on benchmark tests with 15,000 requests:
 ##  Feature Comparison
 
 | Feature                  | TurboGo | Gin | Fiber | Echo |
-|--------------------------|---------|-----|-------|------|
-| ⚡ High Performance       | ✅      | ✅  | ✅    | ✅   |
-| 🧠 Custom Context         | ✅      | ❌  | ❌    | ❌   |
-| 🧵 Middleware Chaining    | ✅      | ✅  | ✅    | ✅   |
-| 🗃️ Built-in Queue         | ✅      | ❌  | ❌    | ❌   |
-| 📢 Pub/Sub Messaging      | ✅      | ❌  | ❌    | ❌   |
-| 💾 Caching Layer          | ✅      | ❌  | ❌    | ❌   |
-| 🧰 CLI Project Generator  | ✅      | ⚠️  | ✅    | ❌   |
-| 📦 Modular Structure      | ✅      | ✅  | ✅    | ✅   |
+| ------------------------ | ------- | --- | ----- | ---- |
+| ⚡ High Performance       | ✅       | ✅   | ✅     | ✅    |
+| 🧠 Custom Context        | ✅       | ❌   | ❌     | ❌    |
+| 🧵 Middleware Chaining   | ✅       | ✅   | ✅     | ✅    |
+| 🗃️ Queue (on-demand)    | ✅       | ❌   | ❌     | ❌    |
+| 📢 Pub/Sub (on-demand)   | ✅       | ❌   | ❌     | ❌    |
+| 💾 Caching (on-demand)   | ✅       | ❌   | ❌     | ❌    |
+| 🧰 CLI Project Generator | ✅       | ⚠️  | ✅     | ❌    |
+| 📦 Modular Structure     | ✅       | ✅   | ✅     | ✅    |
 
 > ⚠️ = Partially available / community-based plugin only
 
 ---
-
-##  Notes & Disclaimer
-
-TurboGo is currently in **active development (v1)** and will continue to evolve.
-
-- 🚧 Some features are experimental and subject to change
-- 🔬 Benchmarks may vary across environments
-- 🙌 Contributions and feedback are always welcome!
 
 If you're looking for a modern, fast, and extensible Go framework — TurboGo might be the right choice for your next project.
 

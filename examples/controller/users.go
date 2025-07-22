@@ -58,8 +58,11 @@ func OnUserCreated(data []byte) error {
 	return nil
 }
 
-func Quehandler(q *core.EngineContext) {
-	q.Queue.RegisterWorkerAll("user:welcome-email", SendWelcomeEmailWorker)
+func Quehandler(ctx *core.EngineContext) {
+	if ctx.Queue == nil {
+		panic("Queue engine not initialized")
+	}
+	ctx.Queue.RegisterWorkerAll("user:welcome-email", SendWelcomeEmailWorker)
 }
 
 func PubsubHandler(ps *core.EngineContext) {

@@ -3,22 +3,18 @@ import Link from "next/link";
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col justify-center items-center min-h-screen relative overflow-hidden">
-      {/* Main content */}
       <div className="relative z-10 mt-5 text-center px-4 max-w-4xl mx-auto">
-        {/* Main heading with gradient text */}
         <h1 className="text-6xl md:text-7xl lg:text-8xl font-black mb-6 text-blue-600 leading-tight">
           TurboGo
         </h1>
 
-        {/* Subtitle */}
         <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-          A high-performance backend framework for Go, designed for developer
-          productivity and{" "}
-          <span className="text-blue-600 font-semibold">blazing fast</span> API
-          development with elegant syntax.
+          A modern, developer-friendly backend framework built for{" "}
+          <span className="text-blue-600 font-semibold">speed</span>,
+          scalability, and minimalism — empowering you to build powerful APIs
+          with ease.
         </p>
 
-        {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
           <Link
             href="/docs"
@@ -37,11 +33,12 @@ export default function HomePage() {
             </span>
           </Link>
         </div>
+
         <div className="grid grid-cols-1 mb-5 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           {[
             {
-              title: "Lightning Fast",
-              desc: "Built with Go for maximum performance and high throughput.",
+              title: "Extreme Performance",
+              desc: "Powered by fasthttp with custom routing for ultra-low latency.",
               icon: (
                 <path
                   strokeLinecap="round"
@@ -52,8 +49,8 @@ export default function HomePage() {
               ),
             },
             {
-              title: "Simple & Elegant",
-              desc: "Clean syntax and intuitive API for efficient development experience.",
+              title: "Minimal, Yet Powerful",
+              desc: "Clean API, clear structure — no clutter, full control over flow.",
               icon: (
                 <path
                   strokeLinecap="round"
@@ -64,8 +61,8 @@ export default function HomePage() {
               ),
             },
             {
-              title: "Production Ready",
-              desc: "Full-featured and scalable — built for enterprise-grade applications.",
+              title: "Ready for Scale",
+              desc: "Built-in support for queueing, pubsub, caching, and graceful shutdowns.",
               icon: (
                 <path
                   strokeLinecap="round"

@@ -3,54 +3,82 @@ title: Logger
 description: Structured and colorful request logging for TurboGo web apps.
 ---
 
-#  Configure Logger
+# Configure Logger
 
-TurboGo includes a built-in structured logger for HTTP requests with readable and colorized output.
+TurboGo includes a built-in structured logger that prints HTTP request logs in a clean and colorized format.  
+Logging is useful during development for observing route hits, debugging, and performance tracing.
 
 ---
 
-##  Initialization
+## Initialization
 
-The logger is enabled automatically when the app starts:
+By default, logger is **enabled automatically** when the app starts:
 
 ```go
-app := TurboGo.New()
-```
+func main() {
+	app := TurboGo.New()
+	app.Get("/", func(ctx *core.Context) {
+		ctx.Text(200, "Hello, world!")
+	})
+}
+````
 
-To disable logging:
+To **disable** logging globally, set the following **before starting the app**:
 
 ```go
-core.DisableLogger = true
+func main() {
+	core.DisableLogger = true // 🔇 Turn off logging
+	app := TurboGo.New()
+	app.Get("/", func(ctx *core.Context) {
+		ctx.Text(200, "Logging disabled!")
+	})
+}
 ```
 
----
-
-##  How It Works
-
-- Logs every HTTP request with method, path, status, and timestamp.
-- Displays extra debug info like caching decisions.
-- Colorized output in terminal to improve readability during development.
+> 🛈 Logging must be disabled **before** any request is handled.
 
 ---
 
-##  Example Log Output
+## How It Works
+
+TurboGo's logger prints structured logs for each request with the following format:
 
 ```log
-🚀 TurboGo [2025-07-13 06:17:22] → POST    /api/users                [201] 
-[DEBUG] 2025-07-13 06:17:22 - [CACHE] DISABLED: POST /api/users
+🌀 TurboGo [05:50:35] GET / [200]
 ```
 
-Each log entry includes:
+Each log includes:
 
-- Timestamp
-- HTTP method and route
-- Status code
-- Optional debug lines (e.g., `[CACHE]` info)
+* ✅ Timestamp (`[HH:MM:SS]`)
+* ✅ HTTP Method (`GET`, `POST`, etc.)
+* ✅ Path (`/`, `/api`, etc.)
+* ✅ Status code (e.g. `[200]`, `[404]`)
+* ✅ Colored output for improved readability
+
+---
+
+## Example Log Output
+
+```
+🌀 TurboGo [12:03:11] GET /             [200]
+🌀 TurboGo [12:03:13] POST /api/user    [201]
+🌀 TurboGo [12:03:15] GET /not-found    [404]
+```
+
+Color coding:
+
+* `200–299` → ✅ Green
+* `300–399` → 📘 Cyan
+* `400–499` → ⚠️ Yellow
+* `500–599` → ❌ Red
 
 ---
 
 ## Use Cases
 
-- Monitor HTTP traffic during development
-- Understand cache behavior per route
-- Debug request flow, performance, and route hits
+* 👀 Monitor HTTP traffic during development
+* 🐞 Debug route access, timing, and status codes
+* ⚙️ Quickly spot routing errors or unexpected behavior
+* 🧪 Performance profiling and access audit
+
+---

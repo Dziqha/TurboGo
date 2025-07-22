@@ -1,0 +1,214 @@
+[
+  {
+    "framework": "Fiber",
+    "total_requests": 384555,
+    "success_requests": 329619,
+    "failed_requests": 54936,
+    "requests_per_second": 42045.6,
+    "avg_latency_ns": 221135,
+    "p95_latency_ns": 871400,
+    "memory_usage_bytes": 81536,
+    "goroutine_count": 48,
+    "concurrency_tests": {
+      "1": {
+        "concurrency": 1,
+        "requests_per_second": 8790.5,
+        "avg_latency_ns": 111012,
+        "p95_latency_ns": 1000200,
+        "error_rate": 14.285876798816904,
+        "success_rate": 85.71412320118309
+      },
+      "10": {
+        "concurrency": 10,
+        "requests_per_second": 38455.5,
+        "avg_latency_ns": 213038,
+        "p95_latency_ns": 871400,
+        "error_rate": 14.285602839645826,
+        "success_rate": 85.71439716035417
+      },
+      "25": {
+        "concurrency": 25,
+        "requests_per_second": 33402.6,
+        "avg_latency_ns": 154620,
+        "p95_latency_ns": 772200,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      },
+      "5": {
+        "concurrency": 5,
+        "requests_per_second": 24926.8,
+        "avg_latency_ns": 184654,
+        "p95_latency_ns": 998600,
+        "error_rate": 14.285828907039813,
+        "success_rate": 85.71417109296019
+      },
+      "50": {
+        "concurrency": 50,
+        "requests_per_second": 42045.6,
+        "avg_latency_ns": 221135,
+        "p95_latency_ns": 1069600,
+        "error_rate": 14.28568030899785,
+        "success_rate": 85.71431969100215
+      }
+    }
+  },
+  {
+    "framework": "Echo",
+    "total_requests": 355340,
+    "success_requests": 304577,
+    "failed_requests": 50763,
+    "requests_per_second": 37125.9,
+    "avg_latency_ns": 456839,
+    "p95_latency_ns": 1017200,
+    "memory_usage_bytes": -58368,
+    "goroutine_count": -51,
+    "concurrency_tests": {
+      "1": {
+        "concurrency": 1,
+        "requests_per_second": 7742.2,
+        "avg_latency_ns": 115867,
+        "p95_latency_ns": 1000600,
+        "error_rate": 14.285345250703935,
+        "success_rate": 85.71465474929607
+      },
+      "10": {
+        "concurrency": 10,
+        "requests_per_second": 35534,
+        "avg_latency_ns": 253877,
+        "p95_latency_ns": 1017200,
+        "error_rate": 14.28575448865875,
+        "success_rate": 85.71424551134125
+      },
+      "25": {
+        "concurrency": 25,
+        "requests_per_second": 31275,
+        "avg_latency_ns": 108363,
+        "p95_latency_ns": 810700,
+        "error_rate": 14.285851318944845,
+        "success_rate": 85.71414868105516
+      },
+      "5": {
+        "concurrency": 5,
+        "requests_per_second": 20328,
+        "avg_latency_ns": 224515,
+        "p95_latency_ns": 775300,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      },
+      "50": {
+        "concurrency": 50,
+        "requests_per_second": 37125.9,
+        "avg_latency_ns": 456839,
+        "p95_latency_ns": 2398300,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      }
+    }
+  },
+  {
+    "framework": "Gin",
+    "total_requests": 344960,
+    "success_requests": 295680,
+    "failed_requests": 49280,
+    "requests_per_second": 41438.8,
+    "avg_latency_ns": 213274,
+    "p95_latency_ns": 1010100,
+    "memory_usage_bytes": -130240,
+    "goroutine_count": 0,
+    "concurrency_tests": {
+      "1": {
+        "concurrency": 1,
+        "requests_per_second": 7149.8,
+        "avg_latency_ns": 125421,
+        "p95_latency_ns": 937000,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      },
+      "10": {
+        "concurrency": 10,
+        "requests_per_second": 34496,
+        "avg_latency_ns": 257265,
+        "p95_latency_ns": 1010100,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      },
+      "25": {
+        "concurrency": 25,
+        "requests_per_second": 32842.1,
+        "avg_latency_ns": 209305,
+        "p95_latency_ns": 1376000,
+        "error_rate": 14.285627289363347,
+        "success_rate": 85.71437271063665
+      },
+      "5": {
+        "concurrency": 5,
+        "requests_per_second": 20179.5,
+        "avg_latency_ns": 249349,
+        "p95_latency_ns": 1016000,
+        "error_rate": 14.285785078916721,
+        "success_rate": 85.71421492108328
+      },
+      "50": {
+        "concurrency": 50,
+        "requests_per_second": 41438.8,
+        "avg_latency_ns": 213274,
+        "p95_latency_ns": 1313700,
+        "error_rate": 14.28564533722019,
+        "success_rate": 85.71435466277981
+      }
+    }
+  },
+  {
+    "framework": "TurboGo",
+    "total_requests": 498274,
+    "success_requests": 427093,
+    "failed_requests": 71181,
+    "requests_per_second": 44575.8,
+    "avg_latency_ns": 339267,
+    "p95_latency_ns": 1013900,
+    "memory_usage_bytes": 13889368,
+    "goroutine_count": 48,
+    "concurrency_tests": {
+      "1": {
+        "concurrency": 1,
+        "requests_per_second": 9594.2,
+        "avg_latency_ns": 85126,
+        "p95_latency_ns": 999900,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      },
+      "10": {
+        "concurrency": 10,
+        "requests_per_second": 49827.4,
+        "avg_latency_ns": 196811,
+        "p95_latency_ns": 1013900,
+        "error_rate": 14.285714285714285,
+        "success_rate": 85.71428571428571
+      },
+      "25": {
+        "concurrency": 25,
+        "requests_per_second": 37999,
+        "avg_latency_ns": 44871,
+        "p95_latency_ns": 300800,
+        "error_rate": 14.285639095765678,
+        "success_rate": 85.71436090423433
+      },
+      "5": {
+        "concurrency": 5,
+        "requests_per_second": 27660.2,
+        "avg_latency_ns": 167486,
+        "p95_latency_ns": 1000400,
+        "error_rate": 14.285869227265168,
+        "success_rate": 85.71413077273483
+      },
+      "50": {
+        "concurrency": 50,
+        "requests_per_second": 44575.8,
+        "avg_latency_ns": 339267,
+        "p95_latency_ns": 875000,
+        "error_rate": 14.285778381992023,
+        "success_rate": 85.71422161800798
+      }
+    }
+  }
+]

@@ -10,12 +10,6 @@ It wraps the low-level HTTP context and offers helpful utilities for building cl
 
 ---
 
-##  Version
-
-> This documentation refers to **TurboGo Context v1**.
-
----
-
 ##  Core Capabilities
 
 The context provides:
@@ -25,6 +19,7 @@ The context provides:
 - 🧠 Session-like key-value storage
 - 🌐 Route & query parsing helpers
 - 🔧 Access to Pubsub and Queue engines
+- 💾 Built-in caching with c.Cache.Set() and c.Cache.Get()
 - ⚙️ Async and parallel execution
 
 ---
@@ -52,14 +47,15 @@ func HelloHandler(c *core.Context) {
 | `c.Header()`       | Get request header                      |
 | `c.SetSession()`   | Store a key in session map              |
 | `c.GetSession()`   | Retrieve key from session               |
-
+| ...                | and more...                             |
 ---
 
 ##  Handler Control
 
 ```go
-func Logger(c *core.Context) {
-    fmt.Println("Path:", c.Path())
+func ExtractUserID(c *core.Context) {
+    userID := c.Param("id")
+    fmt.Println("Processing user ID:", userID)
     c.Next()
 }
 ```
@@ -80,6 +76,26 @@ c.MustPubsub().PublishAll("user.created", data)
 - Will panic if the engine is not set
 - Use `SetQueue()` and `SetPubsub()` to inject them
 
+---
+
+##  Built-in caching
+
+```go
+key := "my-key"
+		val, found := ctx.Cache.Memory.Get(key)
+		if found {
+			fmt.Println("✅ Cache HIT:", key)
+			ctx.Text(200, "From Cache: "+string(val))
+			return
+		}
+
+		fmt.Println("🔄 Cache MISS:", key)
+		result := "Hello, TurboGo!"
+		ctx.Cache.Memory.Set(key, []byte(result), 10*time.Second)
+		ctx.Text(200, "Generated: "+result)
+```
+- Use `c.Cache.Set()` and `c.Cache.Get()` to  inject them
+- To activate the caching system, initialize TurboGo with `.WithCache()`
 ---
 
 ##  Concurrency Utilities

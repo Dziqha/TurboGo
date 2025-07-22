@@ -23,6 +23,17 @@ Whether you're building REST APIs, background workers, or full-blown web service
 
 Unlike traditional Go frameworks that tightly couple logic and routing, TurboGo gives you full control over execution flow using chained handlers, custom contexts, and built-in systems for queues and messaging — all designed to reduce boilerplate and improve modularity.
 
+🔀 TurboGo Routing Philosophy
+TurboGo introduces a custom Tiered Zero-Copy Routing (TZCR) model powered by a fast adaptive router. This design prioritizes speed by avoiding unnecessary allocations and resolving routes in a tiered fashion:
+
+- Static, parametric, and wildcard routes are handled in separate tiers for minimal lookup time.
+
+- Middleware and handlers are precompiled and chained efficiently with zero-copy context passing.
+
+This approach results in ultra-fast response times, even under high concurrency, making TurboGo ideal for performance-critical APIs and microservices.
+
+
+
 ---
 
 ##  Explore the Docs

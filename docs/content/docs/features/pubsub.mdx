@@ -9,23 +9,30 @@ TurboGo includes an in-memory publish/subscribe (pubsub) system for event-driven
 
 ---
 
-##  Structure Integration
+## Structure Integration
 
 Pubsub is initialized in `main.go` via:
 
 ```go
-ctx := app.InitEmptyEngine()
-app.WithPubsub(ctx)
-go controller.PubsubWorker(ctx)
+app := TurboGo.New().WithPubsub()
+go controller.PubsubHandler(app.EngineCtx)
 ```
+
+> ✅ You can also chain it with other modules:
+>
+> ```go
+> app := TurboGo.New().WithCache().WithQueue().WithPubsub()
+> ```
 
 ---
 
-##  How It Works
+## How It Works
 
-- Publish messages with `Publish(topic, data)`
-- Listeners consume messages per topic
-- Supports delivery via memory, storage, or both
+* Publish messages using `Publish(topic, data)`
+* Listeners can subscribe to specific topics using `Subscribe(topic)` or `SubscribeAll()`
+* Messages are delivered asynchronously via channels
+* Supports multiple consumers per topic
+* Can be extended to include persistence, retries, or dead-letter logic
 
 ---
 
@@ -63,9 +70,23 @@ ch := c.Pubsub.SubscribeAll("user.created")
 ### Handling events example:
 
 ```go
-for msg := range ch {
-	if err := OnUserCreated(msg); err != nil {
-		fmt.Printf("Error processing pubsub message: %v\n", err)
+func OnUserCreated(data []byte) error {
+	var input CreateUserInput
+	if err := json.Unmarshal(data, &input); err != nil {
+		return fmt.Errorf("invalid pubsub data: %w", err)
+	}
+	fmt.Printf("📣 PubSub Event: %s <%s>\n", input.Name, input.Email)
+	return nil
+}
+```
+
+```go
+func PubsubHandler(ps *core.EngineContext) {
+	ch := ps.Pubsub.SubscribeAll("user.created")
+	for msg := range ch {
+		if err := OnUserCreated(msg); err != nil {
+			fmt.Println("❌ pubsub handler error:", err)
+		}
 	}
 }
 ```

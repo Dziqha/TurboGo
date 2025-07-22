@@ -9,7 +9,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/Dziqha/TurboGo)](https://github.com/Dziqha/TurboGo/commits)
 [![Issues](https://img.shields.io/github/issues/Dziqha/TurboGo)](https://github.com/Dziqha/TurboGo/issues)
 
-**TurboGo** is a blazing-fast, middleware-first, and event-driven web framework built with Go — inspired by Express, but optimized for high concurrency, clean extensibility, and developer control.
+**TurboGo** employs a `Tiered Zero-Copy Routing (TZCR)` system that categorizes routes into three levels—static, parametric, and wildcard—for optimal performance. Each route is precompiled and stored in a cache-aware structure, enabling fast, zero-allocation matching. Middleware is executed through efficient handler chaining, and route grouping allows modular design with custom prefixes and middlewares. This approach makes TurboGo ideal for high-performance applications without sacrificing flexibility.
 
 **TurboGo Key Features are :**
 
@@ -17,7 +17,7 @@
 - Ultra-fast router & context engine
 - Built-in async engines (PubSub, Queue, Cache)
 - Extensible and clean internal architecture
-- Optional middleware: Auth, Logger, Recovery, Auto-cache
+- Optional middleware: Auth, Logger, Recovery
 - CLI generator: `npx create-turbogo` for instant project scaffolding
 
 
@@ -31,36 +31,40 @@
                            └────┬───────┘
                                 │
                                 ▼
-                        ┌───────────────┐
-                        │  HTTP Router  │  ← core/routing.go
-                        └─────┬─────────┘
+                         ┌────────────┐
+                         │  RouterApp │ ← turbo/router.go
+                         └────┬───────┘
                               ▼
-              ┌────────────────────────────────┐
-              │  Turbo Middleware Pipeline      │ ← middleware/logger.go, auth.go, etc.
-              └────────┬───────────────────────┘
-                       ▼
+                  ┌──────────────────────────────┐
+                  │ Tiered Zero-Copy Router (TZCR)│ ← turbo/route/engine.go
+                  └────────────┬──────────────────┘
+                               ▼
+              ┌────────────────────────────────────┐
+              │   Group & Handler Resolver Layer    │ ← supports .Use(), .Group(), .Add()
+              └────────────┬───────────────────────┘
+                           ▼
         ┌────────────────────────────────────────────┐
-        │ Redis Auto-Cache Layer (Check & Set)        │ ← middleware/cache.go
-        └────────┬──────────────────────────────┬─────┘
-                 ▼                              ▼
-          Cache Hit → Return JSON       Cache Miss → Proceed
+        │ Middleware Stack (Cache, Logger, Auth...)   │ ← internal/middleware/*
+        └────────┬────────────────────────────┬──────┘
+                 ▼                            ▼
+          Cache Hit → Return Response   Cache Miss → Continue
                                                  │
                                                  ▼
                            ┌──────────────────────────────┐
-                           │     Handler Logic (Dev)      │ ← developer handler: func(ctx *Context)
+                           │     Developer Handler Logic   │ ← func(ctx *Context)
                            └──────────────┬───────────────┘
                                           ▼
                      ┌────────────────────────────────────────────┐
-                     │       Embedded Infrastructure Engine       │ ← core/context.go
+                     │   Integrated Async Engine (PubSub/Queue)    │ ← internal/*
                      └──────┬────────────┬────────────┬───────────┘
                             ▼            ▼            ▼
                          Redis         Kafka       RabbitMQ
                       (inmem.go)   (pubsub.go)   (taskqueue.go)
                             ▼            ▼            ▼
-                         persist       persist       persist
-                          (.json)       (.log)        (.log)
+                         persist       emit         enqueue
                                 ▼
-                        Response + Cache Set
+                        Response + Optional Cache
+
 ```
 
 ---
@@ -137,18 +141,19 @@ go run example.go
 
 ## 🧪 Benchmark Overview
 
-| Benchmark Name | Iterations | Time per Operation | Memory per Operation | Allocations per Operation |
-|---|---|---|---|---|
-| BenchmarkPubSub_1000Messages-12 | 3,941,121 | 284.3 ns/op | 249 B/op | 4 allocs/op |
-| BenchmarkTaskQueue_1000Tasks-12 | 4,266,667 | 297.1 ns/op | 4 B/op | 1 allocs/op |
-| BenchmarkTaskQueue_WithDelay-12 | 1,069 | 1,124,821 ns/op | 252 B/op | 4 allocs/op |
-| BenchmarkTaskQueue_CPUProfile-12 | 1,883,364 | 652.6 ns/op | 4 B/op | 1 allocs/op |
-| BenchmarkCPUPrint-12 | 1,000,000,000 | 0.4956 ns/op | 0 B/op | 0 allocs/op |
-| BenchmarkTaskQueue_Print-12 | 1,809,789 | 652.3 ns/op | 4 B/op | 1 allocs/op |
-| BenchmarkTaskQueue_Parallel-12 | 28,087,125 | 46.83 ns/op | 18 B/op | 1 allocs/op |
-| BenchmarkTaskQueue_DelayRetry-12 | 24,147,055 | 48.40 ns/op | 19 B/op | 1 allocs/op |
-| BenchmarkTaskQueue_WorkerPool-12 | 4,324,900 | 306.5 ns/op | 4 B/op | 1 allocs/op |
-| BenchmarkTaskQueue_RateLimit-12 | 2,259 | 533,127 ns/op | 3 B/op | 1 allocs/op |
+| Benchmark                       | Iterations    | Time/op   | Bytes/op | Allocs/op |
+| ------------------------------- | ------------- | --------- | -------- | --------- |
+| `BenchmarkPubSub_1000Messages`  | 4,181,076     | 270.6 ns  | 249 B    | 4         |
+| `BenchmarkTaskQueue_1000Tasks`  | 4,182,391     | 272.4 ns  | 4 B      | 1         |
+| `BenchmarkTaskQueue_WithDelay`  | 1,071         | 1.107 ms  | 252 B    | 4         |
+| `BenchmarkTaskQueue_CPUProfile` | 1,889,114     | 644.6 ns  | 4 B      | 1         |
+| `BenchmarkCPUPrint`             | 1,000,000,000 | 0.4827 ns | 0 B      | 0         |
+| `BenchmarkTaskQueue_Print`      | 1,880,923     | 638.5 ns  | 4 B      | 1         |
+| `BenchmarkTaskQueue_Parallel`   | 27,765,244    | 43.82 ns  | 18 B     | 1         |
+| `BenchmarkTaskQueue_DelayRetry` | 26,241,208    | 45.48 ns  | 19 B     | 1         |
+| `BenchmarkTaskQueue_WorkerPool` | 4,241,274     | 295.7 ns  | 4 B      | 1         |
+| `BenchmarkTaskQueue_RateLimit`  | 2,211         | 529.5 µs  | 3 B      | 1         |
+
 
 > Benchmarked on Windows `amd64, Ryzen 5 5600H, Go 1.24.` ⚠️ Results may vary—run on idle system for accuracy.
 ---

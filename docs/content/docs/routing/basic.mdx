@@ -6,12 +6,13 @@ description: Introduction to route definitions in TurboGo.
 # Configure Routing
 
 TurboGo provides a flexible and high-performance routing system inspired by popular Go frameworks.
+At its core, TurboGo uses a custom **Tiered Zero-Copy Routing (TZCR)** engine that separates **static**, **parametric**, and **wildcard** routes into different tiers for ultra-fast resolution.
 
----
+Unlike traditional routers, TurboGo precompiles handler chains, passes context using a **zero-copy** strategy, and avoids unnecessary allocations — all designed to optimize for concurrency and minimal latency.
 
-##  Version
+> 🧪 In internal benchmarks, TurboGo consistently outperforms popular frameworks like Gin and Fiber in routing-heavy workloads.
 
-> This documentation refers to **TurboGo Routing v1**.
+
 
 ---
 

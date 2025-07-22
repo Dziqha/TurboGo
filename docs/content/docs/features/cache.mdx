@@ -1,54 +1,75 @@
 ---
 title: Cache
-description: Built-in route-level caching system with TTL support in TurboGo.
+description: Built-in manual caching system with TTL support in TurboGo.
 ---
 
-#  Configure Cache
+#  Configure Manual Cache
 
-TurboGo provides a lightweight built-in caching system that stores responses in memory with optional TTL (time-to-live).
+TurboGo provides a lightweight **manual caching system** that allows you to store responses or computed values in memory with a custom TTL (time-to-live) per request context.
 
-By default, **all `GET` routes are cached for 5 minutes** unless explicitly overridden. Other HTTP methods (`POST`, `PUT`, etc.) are **not cached** unless `.Cache()` is used.
+> ✅ Default route-level automatic caching is **no longer used**. You now have **full control** via `ctx.Cache.Memory`.
 
 ---
 
-##  Structure Integration
+##  Enable Cache
 
-```plaintext
-pkg/routes/router.go
+To activate the caching system, initialize TurboGo with `.WithCache()`:
+
+```go
+app := TurboGo.New().WithCache()
 ```
 
-This is where routes are registered and caching behavior is configured using `.Cache(ttl)` or `.NoCache()`.
+> ✅ You can also chain it with other modules:
+>
+> ```go
+> app := TurboGo.New().WithCache().WithQueue().WithPubsub()
+> ```
 
----
 
-##  How It Works
-
-- `GET` routes are automatically cached for 5 minutes (300 seconds).
-- Non-GET methods are never cached by default.
-- You can override caching behavior per route using `.Cache(duration)` or disable it with `.NoCache()`.
+This sets up a safe, in-memory TTL cache that can be used inside any handler.
 
 ---
 
 ##  Example Usage
 
 ```go
-r.Get("/home", HomeHandler) // Cached by default for 5 minutes
-r.Get("/blog", BlogHandler).Cache(2 * time.Minute)
-r.Get("/stats", StatsHandler).NoCache()
-r.Post("/submit", SubmitHandler).Cache(1 * time.Minute) // Enable cache manually
+func main() {
+	app := TurboGo.New().WithCache()
+
+	app.Get("/", func(ctx *core.Context) {
+		key := "my-key"
+		val, found := ctx.Cache.Memory.Get(key)
+		if found {
+			fmt.Println("✅ Cache HIT:", key)
+			ctx.Text(200, "From Cache: "+string(val))
+			return
+		}
+
+		fmt.Println("🔄 Cache MISS:", key)
+		result := "Hello, TurboGo!"
+		ctx.Cache.Memory.Set(key, []byte(result), 10*time.Second)
+		ctx.Text(200, "Generated: "+result)
+	})
+
+	app.Listen(":8080")
+}
 ```
 
 ---
 
-## Behind the Scenes
+##  How It Works
 
-TurboGo uses an in-memory cache engine optimized for high-throughput web applications.  
-It is built with safe concurrency mechanisms and automatic TTL cleanup to ensure reliable performance and memory efficiency.
+* Each request gets access to `ctx.Cache.Memory`, a concurrency-safe in-memory TTL cache.
+* You control what gets stored, when it expires, and how it’s fetched.
+* No automatic route-based cache means you can cache anything: computed data, responses, third-party calls, etc.
 
 ---
 
-## Use Cases
+##  Use Cases
 
-- Speed up static or semi-static endpoints
-- Reduce load on database and external APIs
-- Avoid redundant processing for frequent requests
+* Cache database or external API responses per user/request
+* Store computed results temporarily for performance
+* Reduce redundant processing on high-traffic endpoints
+
+---
+

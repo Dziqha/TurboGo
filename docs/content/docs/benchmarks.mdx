@@ -1,75 +1,78 @@
 ---
 title: Benchmarks
-description: Benchmark results and built-in features of TurboGo version 1.0
+description: Benchmark results and built-in features of TurboGo
 ---
 
 import { ResponsiveImage } from '@/components/responsive-image';
 
-#  TurboGo v1.0 – Initial Release Highlights
 
-**TurboGo** is a high-performance, modular Go web framework built for speed, simplicity, and extensibility. Version 1.0 marks the first stable release with promising benchmark results.
+**TurboGo** is a high-performance, modular Go web framework built for speed, simplicity, and extensibility.
 
 ---
+> ⚠️ Benchmarked on Windows amd64, Ryzen 5 5600H, Go 1.24. The test was run 3 times consecutively, and the result displayed corresponds to the final iteration.
 
-## Time per Request 
+## Average Latency
 
 <ResponsiveImage
-  lightSrc="/images/tpr-light.png"
-  darkSrc="/images/tpr.png"
+  lightSrc="/images/latencySection_light.png"
+  darkSrc="/images/latencySection.png"
   alt="Requests per second chart"
   className="w-full h-auto"
 />
 
 
-| Framework   | Time per Request|
+| Framework   | Latency|
 |-------------|-------------|
-| TurboGo 🌀   | **38.42ms** |
-| Echo        | 39.41ms     |
-| Gin         | 36.93ms     |
-| Fiber       | **31.57ms** |
+| TurboGo 🌀   | **167μs** |
+| Echo        | 230μs    |
+| Gin         | 225μs    |
+| Fiber       | 376μs |
 
-> ⏱️ TurboGo maintains low response times, making it a reliable choice for fast APIs.
+> ⏱️ TurboGo consistently delivers the lowest response times, making it an excellent choice for building ultra-fast and responsive APIs.
 
 ---
 
-##  Transfer Rate
+## Concurrency Performance
 
 <ResponsiveImage
-  lightSrc="/images/tr-light.png"
-  darkSrc="/images/tr.png"
+  lightSrc="/images/concurrency-performance_light.png"
+  darkSrc="/images/concurrency-performance.png"
   alt="Requests per second chart"
   className="w-full h-auto"
 />
 
 
-| Framework   | Transfer Rate |
-|-------------|----------------|
-| TurboGo 🌀   | **414.37 KB/s** |
-| Echo        | 327.09 KB/s     |
-| Gin         | 346.42 KB/s     |
-| Fiber       | **470.19 KB/s** |
+| Concurrency | TurboGo 🌀    | Fiber        | Gin       | Echo      |
+| ----------- | ------------- | ------------ | --------- | --------- |
+| 1           | 9,705.70      | **9,751.30** | 8,810.40  | 8,929.20  |
+| 5           | **25,590.30** | 25,037.60    | 22,313.50 | 22,306.80 |
+| 10          | **48,028.70** | 41,602.60    | 38,309.90 | 37,462.70 |
+| 25          | 37,778.70     | 36,641.80    | 34,648.20 | 34,330.50 |
+| 50          | **48,124.70** | 45,156.70    | 43,090.50 | 40,960.80 |
 
-> 🚀 Excellent throughput performance with TurboGo ranking second overall.
+
+> ⚙️ TurboGo delivers high and consistent performance across all concurrency levels.
+It leads at 10 and 50 concurrent requests with 48k+ req/sec, proving its scalability.
 
 ---
 
 ##  Requests Per Second (RPS)
 
 <ResponsiveImage
-  lightSrc="/images/rps-light.png"
-  darkSrc="/images/rps.png"
+  lightSrc="/images/rpsSection_light.png"
+  darkSrc="/images/rpsSection.png"
   alt="Requests per second chart"
   className="w-full h-auto"
 />
 
 | Framework   | Requests/sec |
 |-------------|--------------|
-| TurboGo 🌀   | **2,603.16** |
-| Echo        | 2,537.45     |
-| Gin         | 2,707.89     |
-| Fiber       | **3,167.61** |
+| TurboGo 🌀   | **48,124.70** |
+| Echo        | 40,960.80    |
+| Gin         | 43,090.50   |
+| Fiber       | 45,156.70 |
 
-> 📊 TurboGo is stable and competitive under high request loads.
+> 📊 TurboGo handles high traffic efficiently, maintaining stability and outperforming other frameworks in throughput.
 
 ---
 
@@ -84,12 +87,6 @@ TurboGo ships with powerful built-in systems to accelerate backend development:
 - ✅ **Caching Layer** – in-memory and file-based cache with TTL
 - ✅ **CLI Generator** – project scaffolding via `turbogo new`
 - ✅ **Structured Logger** – no external dependency required
-
----
-
-##  About Version 1.0
-
-> This is the **first official release** of TurboGo. While results are promising, features are still evolving. Community feedback and contributions are highly welcome!
 
 ---
 
