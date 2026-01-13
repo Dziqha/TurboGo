@@ -1,0 +1,21 @@
+{
+  "name": "TurboGo Documentation",
+  "short_name": "TurboGo",
+  "description": "Official documentation for TurboGo – a blazing fast Go framework",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/images/cyclone.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/cyclone.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
