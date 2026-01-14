@@ -1,21 +1,42 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col justify-center items-center min-h-screen relative overflow-hidden">
-      <div className="relative z-10 mt-5 text-center px-4 max-w-4xl mx-auto">
-        <h1 className="text-6xl md:text-7xl lg:text-8xl font-black mb-6 text-blue-600 leading-tight">
+      <div className="relative z-10 mt-5 text-center px-4 max-w-6xl mx-auto">
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <Image
+              src="/images/icon.png"
+              alt="TurboGo TZCR Architecture"
+              width={320}
+              height={320}
+              priority
+              className="drop-shadow-2xl"
+            />
+            <div className="absolute inset-0 -z-10 rounded-full bg-blue-500/30 blur-3xl" />
+          </div>
+        </div>
+
+        <h1 className="text-6xl md:text-7xl lg:text-8xl font-black mb-2 text-blue-600 leading-tight">
           TurboGo
         </h1>
 
-        <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-          A modern, developer-friendly backend framework built for{" "}
-          <span className="text-blue-600 font-semibold">speed</span>,
-          scalability, and minimalism — empowering you to build powerful APIs
-          with ease.
+        <p className="text-sm uppercase tracking-widest text-blue-500 font-semibold mb-6">
+          Powered by Tiered Zero-Copy Routing (TZCR)
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+        <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
+          A modern, developer-friendly backend framework built on{" "}
+          <span className="text-blue-600 font-semibold">
+            Tiered Zero-Copy Routing (TZCR)
+          </span>{" "}
+          — engineered for extreme speed, scalability, and minimalism to help
+          you build powerful APIs with absolute efficiency.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-14">
           <Link
             href="/docs"
             className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-full font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-105 hover:-translate-y-1"
@@ -34,11 +55,23 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 mb-5 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           {[
             {
+              title: "Tiered Zero-Copy Routing",
+              desc: "Multi-layer routing engine with zero-allocation handler resolution for blazing-fast request dispatch.",
+              icon: (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 12h6m6 0h6M9 6l6 6-6 6"
+                />
+              ),
+            },
+            {
               title: "Extreme Performance",
-              desc: "Powered by fasthttp with custom routing for ultra-low latency.",
+              desc: "Powered by fasthttp with custom routing optimized for ultra-low latency.",
               icon: (
                 <path
                   strokeLinecap="round"
@@ -50,7 +83,7 @@ export default function HomePage() {
             },
             {
               title: "Minimal, Yet Powerful",
-              desc: "Clean API, clear structure — no clutter, full control over flow.",
+              desc: "Clean API, clear structure — no clutter, full control over application flow.",
               icon: (
                 <path
                   strokeLinecap="round"
@@ -87,6 +120,7 @@ export default function HomePage() {
                   {item.icon}
                 </svg>
               </div>
+
               <h3 className="text-xl font-semibold text-neutral-800 dark:text-white mb-2">
                 {item.title}
               </h3>

@@ -21,11 +21,11 @@ export const baseOptions: BaseLayoutProps = {
           <circle cx={12} cy={12} r={12} fill="currentColor" />
         </svg> */}
         <Image
-          src="/images/cyclone.png"
+          src="/images/icon.png"
           alt="Logo"
-          width={24}
-          height={24}
-          className="inline-block mr-2"
+          width={50}
+          height={50}
+          className="inline-block mr-[-0.5rem]"
         />
         TurboGo
       </>

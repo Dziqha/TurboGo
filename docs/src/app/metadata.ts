@@ -80,14 +80,14 @@ export const defaultMetadata: Metadata = {
 
   icons: {
     icon: [
-      { url: "/images/cyclone.png" },
-      { url: "/images/cyclone.png", sizes: "32x32", type: "image/png" },
-      { url: "/images/cyclone.png", sizes: "16x16", type: "image/png" },
+      { url: "/images/icon.png" },
+      { url: "/images/icon.png", sizes: "32x32", type: "image/png" },
+      { url: "/images/icon.png", sizes: "16x16", type: "image/png" },
     ],
-    shortcut: "/images/cyclone.png",
+    shortcut: "/images/icon.png",
     apple: [
-      { url: "/images/cyclone.png" },
-      { url: "/images/cyclone.png", sizes: "180x180", type: "image/png" },
+      { url: "/images/icon.png" },
+      { url: "/images/icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
 

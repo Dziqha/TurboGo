@@ -1,4 +1,4 @@
-# 🌀 TurboGo — High Performance Middleware-First Go Framework
+# TurboGo
 
 [![Go](https://img.shields.io/badge/Go-1.24-blue)](https://go.dev)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
@@ -8,6 +8,8 @@
 [![License](https://img.shields.io/github/license/Dziqha/TurboGo)](./LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/Dziqha/TurboGo)](https://github.com/Dziqha/TurboGo/commits)
 [![Issues](https://img.shields.io/github/issues/Dziqha/TurboGo)](https://github.com/Dziqha/TurboGo/issues)
+
+<img src="./docs/public/images/icon.png" alt="TurboGo Banner" width="100%"/>
 
 **TurboGo** employs a `Tiered Zero-Copy Routing (TZCR)` system that categorizes routes into three levels—static, parametric, and wildcard—for optimal performance. Each route is precompiled and stored in a cache-aware structure, enabling fast, zero-allocation matching. Middleware is executed through efficient handler chaining, and route grouping allows modular design with custom prefixes and middlewares. This approach makes TurboGo ideal for high-performance applications without sacrificing flexibility.
 
@@ -19,53 +21,6 @@
 - Extensible and clean internal architecture
 - Optional middleware: Auth, Logger, Recovery
 - CLI generator: `npx create-turbogo` for instant project scaffolding
-
-
----
-
-## 🧭 Request Lifecycle Overview
-
-```
-                           ┌────────────┐
-                           │   Client   │
-                           └────┬───────┘
-                                │
-                                ▼
-                         ┌────────────┐
-                         │  RouterApp │ ← turbo/router.go
-                         └────┬───────┘
-                              ▼
-                  ┌──────────────────────────────┐
-                  │ Tiered Zero-Copy Router (TZCR)│ ← turbo/route/engine.go
-                  └────────────┬──────────────────┘
-                               ▼
-              ┌────────────────────────────────────┐
-              │   Group & Handler Resolver Layer    │ ← supports .Use(), .Group(), .Add()
-              └────────────┬───────────────────────┘
-                           ▼
-        ┌────────────────────────────────────────────┐
-        │ Middleware Stack (Cache, Logger, Auth...)   │ ← internal/middleware/*
-        └────────┬────────────────────────────┬──────┘
-                 ▼                            ▼
-          Cache Hit → Return Response   Cache Miss → Continue
-                                                 │
-                                                 ▼
-                           ┌──────────────────────────────┐
-                           │     Developer Handler Logic   │ ← func(ctx *Context)
-                           └──────────────┬───────────────┘
-                                          ▼
-                     ┌────────────────────────────────────────────┐
-                     │   Integrated Async Engine (PubSub/Queue)    │ ← internal/*
-                     └──────┬────────────┬────────────┬───────────┘
-                            ▼            ▼            ▼
-                         Redis         Kafka       RabbitMQ
-                      (inmem.go)   (pubsub.go)   (taskqueue.go)
-                            ▼            ▼            ▼
-                         persist       emit         enqueue
-                                ▼
-                        Response + Optional Cache
-
-```
 
 ---
 
