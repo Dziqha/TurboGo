@@ -48,18 +48,21 @@ export AUTH_SECRET=supersecurekey123
 go get github.com/Dziqha/TurboGo
 ```
 
-### TurboGo CLI (`npx create-turbogo`)
+### TurboGo CLI (`npx create-turbogo@latest`)
 
 > Scaffold TurboGo apps instantly via CLI.
 
 ```bash
-npx create-turbogo myapp
+npx create-turbogo@latest myapp
 ```
 
-Prompted features:
+Interactive prompts:
 
-* ✅ Controller name
-* 📁 Structure auto-generated
+* ✅ Feature name (e.g. user, auth, order)
+
+* 📁 Feature-based project structure generated automatically
+
+* ⚙️ Ready-to-extend architecture out of the box
 
 > ⚠️ We intentionally use Node.js to overcome limitations of Go's CLI tooling, especially for rich interactive workflows.
 

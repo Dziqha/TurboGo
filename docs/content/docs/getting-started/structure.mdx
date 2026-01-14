@@ -1,57 +1,58 @@
 ---
 title: Structure
-description: Overview of the default project structure in TurboGo
+description: Overview of the default feature-based project structure in TurboGo
 ---
 
-#  Project Structure
+# Project Structure
 
-TurboGo encourages a modular and clean project layout.  
-This is the default folder structure you get when running `turbogo new`.
-
----
-> ⚠️ The `data/` folder only appears if you use **Queue** or **Pubsub** with file storage mode.
+TurboGo uses a **feature-based architecture** to keep projects modular, scalable, and easy to maintain.  
+This is the default folder structure generated when running `turbogo new`.
 
 import { File, Folder, Files } from 'fumadocs-ui/components/files';
 
 <Files>
-  <Folder name="data" disable>
-    <File name="pubsub.json" />
-    <File name="queue.json" />
-  </Folder>
-  <Folder name="pkg" defaultOpen>
-    <Folder name="controllers" defaultOpen>
-    <File name="user.go" />
-    </Folder>
-    <Folder name="routes" defaultOpen>
-    <File name="router.go" />
+  <Folder name="features" defaultOpen>
+    <Folder name="[feature-name]" defaultOpen>
+      <File name="handler.go" />
+      <File name="service.go" />
+      <File name="repository.go" />
+      <File name="router.go" />
     </Folder>
   </Folder>
-  <File name=".env" />
-  <File name=".gitignore" />
-  <File name="go.mod" />
-  <File name="go.sum" />
+
   <File name="main.go" />
+  <File name=".env" />
   <File name="README.md" />
 </Files>
 
 ---
 
-##  Structure Highlights
+## Structure Highlights
 
-- `pkg/controllers/`: Contains business logic handlers such as user management, authentication, etc.
-- `pkg/routes`: Defines routing rules and middleware setup.
-- `.env`: Holds environment variables like `PORT`, `DB_URL`, and secret keys.
-- `.gitignore`: Specifies which files/folders to exclude from version control (e.g., `.env`, `bin/`, `node_modules/`).
-- `go.mod/go.sum` : Go module metadata and dependency list.
-- `main.go`: Application entry point that initializes the server and core services.
-- `README.md`: Basic documentation about the project, how to run it, and its structure.
+- `features/`: Contains all application features. Each feature is fully self-contained.
+- `features/[feature-name]/handler.go`: HTTP handlers responsible for handling requests and responses.
+- `features/[feature-name]/service.go`: Business logic and domain rules.
+- `features/[feature-name]/repository.go`: Data access layer (database, cache, external APIs).
+- `features/[feature-name]/router.go`: Route definitions and feature-level middleware.
+- `main.go`: Application entry point that initializes the app and registers all feature routers.
+- `.env`: Environment variables such as `PORT`, `DB_URL`, and secret keys.
+- `README.md`: Project documentation and usage instructions.
 
 ---
 
-##  Generated with CLI
+## Why Feature-Based?
 
-This layout is generated automatically when you run:
+- ✅ **Modular**: Each feature is independent and easy to reason about  
+- ✅ **Scalable**: Add new features without touching unrelated code  
+- ✅ **Maintainable**: Changes are localized to the feature they belong to  
+- ✅ **Testable**: Each layer within a feature can be tested independently  
+
+---
+
+## Generated with CLI
+
+This structure is generated automatically when you run:
 
 ```bash
-npx create-turbogo my-app
+npx create-turbogo@latest my-app
 ```

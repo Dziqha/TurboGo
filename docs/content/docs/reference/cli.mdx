@@ -27,29 +27,35 @@ Unlike Go-based CLIs, TurboGo CLI is implemented in **Node.js** using tools like
 No need to install anything globally. Just run:
 
 ```bash
-npx create-turbogo my-app
+npx create-turbogo@latest my-app
 ````
 
 This will generate the default TurboGo project structure:
 
 ```bash
 my-app/
+├── features/
+│   └── [feature-name]/
+│       ├── handler.go       # HTTP handlers
+│       ├── service.go       # Business logic
+│       ├── repository.go    # Data access
+│       └── router.go        # Route registration
 ├── main.go
-├── go.mod
-├── pkg/
-│   ├── controllers/
-│   └── routes/
-└── ...
+├── .env
+└── README.md
 ```
 
 ---
 
-##  Features
+## Benefits of Feature-Based Architecture:
 
-* ✅ Generate full project boilerplate
-* ✅ Clean folder structure (controller, router, entrypoint)
-* ✅ Preconfigured `go.mod`, `.env`, `.gitignore`
-* ✅ Optional dummy controller or auth setup
+* ✅ Modular: Each feature is independent and self-contained
+
+* ✅ Scalable: Easy to add new features without changing existing structure
+
+* ✅ Maintainable: Code is easier to locate, understand, and modify by feature
+
+* ✅ Testable: Each layer can be tested independently
 
 ---
 
@@ -64,7 +70,7 @@ my-app/
 ##  Example Command
 
 ```bash
-npx create-turbogo myapp
+npx create-turbogo@latest myapp
 ```
 
 Follow the prompt and your project will be scaffolded automatically.
@@ -76,7 +82,9 @@ Follow the prompt and your project will be scaffolded automatically.
 After generation:
 
 ```bash
-cd myapp
+cd bisa
+go mod tidy
+Configure your .env file
 go run .
 ```
 
