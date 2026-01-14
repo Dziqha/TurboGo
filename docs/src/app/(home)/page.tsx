@@ -5,9 +5,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen px-6">
       <div className="mx-auto max-w-6xl pt-24 pb-24">
-        {/* HERO */}
         <section className="grid grid-cols-1 gap-12 mb-24">
-          {/* Brand */}
           <div className="mx-auto max-w-2xl text-center">
             <div className="flex justify-center mb-8">
               <Image
@@ -46,7 +44,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* DESCRIPTION */}
         <section className="mx-auto max-w-3xl mb-24">
           <p className="text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed text-center">
             TurboGo is a modern backend framework designed for engineers who
@@ -58,7 +55,6 @@ export default function HomePage() {
           </p>
         </section>
 
-        {/* FEATURES */}
         <section className="border-t border-neutral-200 dark:border-neutral-800 pt-20">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             {[
