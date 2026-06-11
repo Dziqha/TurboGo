@@ -37,18 +37,10 @@ func initDB() {
 			continue
 		}
 		p.Config().MaxConns = 64
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		err = p.Ping(ctx)
-		cancel()
-		if err == nil {
-			pool = p
-			return
-		}
-		p.Close()
-		time.Sleep(time.Second)
+		pool = p
+		return
 	}
-	panic("failed to connect to database after 30 retries")
+	panic("failed to create database pool: " + err.Error())
 }
 
 func batchExec(worlds []World) {
