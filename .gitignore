@@ -1,4 +1,5 @@
-*.sum
-*.mod
 /data/
 *.txt
+*.exe
+*.sql
+*~

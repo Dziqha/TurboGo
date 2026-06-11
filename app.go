@@ -2,9 +2,12 @@ package TurboGo
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"runtime"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/Dziqha/TurboGo/core"
 	"github.com/Dziqha/TurboGo/internal/cache"
@@ -14,6 +17,10 @@ import (
 	"github.com/fatih/color"
 	"github.com/valyala/fasthttp"
 )
+
+func b2s(b []byte) string {
+	return unsafe.String(unsafe.SliceData(b), len(b))
+}
 
 const maxLineLength = 50
 
@@ -146,26 +153,44 @@ func (a *App) Route(path string) *router.Route {
 func (a *App) RunServer(addr string) error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	fmt.Println(Banner(addr))
-	return fasthttp.ListenAndServe(addr, a.Handler())
+
+	srv := &fasthttp.Server{
+		Handler:                       a.Handler(),
+		Name:                          "TurboGo",
+		Logger:                        log.New(io.Discard, "", 0),
+		LogAllErrors:                  false,
+		ReadBufferSize:                4096,
+		WriteBufferSize:               4096,
+		Concurrency:                   256 * 1024,
+		MaxConnsPerIP:                 10000,
+		MaxRequestsPerConn:            0,
+		DisableKeepalive:              false,
+		TCPKeepalive:                  false,
+		ReduceMemoryUsage:             false,
+		NoDefaultServerHeader:         true,
+		NoDefaultDate:                 true,
+		NoDefaultContentType:          false,
+		DisableHeaderNamesNormalizing: true,
+		DisablePreParseMultipartForm:  true,
+		StreamRequestBody:             false,
+		GetOnly:                       false,
+	}
+	return srv.ListenAndServe(addr)
 }
 
 func (a *App) Handler() fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		method := string(ctx.Method())
-		path := string(ctx.Path())
-		handler, route, params := a.singleRouter.Find(method, path)
+		method := b2s(ctx.Method())
+		path := b2s(ctx.Path())
 
-		allHandlers := make([]core.Handler, 0, len(a.middleware)+1)
-		allHandlers = append(allHandlers, a.middleware...)
-		allHandlers = append(allHandlers, handler)
-		allHandlers = append(allHandlers, loggerMiddleware)
+		c := core.NewContext(ctx, a.cache, nil)
 
-		c := core.NewContext(ctx, a.cache, allHandlers)
+		handler, route := a.singleRouter.Find(method, path, c.Params())
 
-		if len(params) > 0 {
-			for k, v := range params {
-				c.SetParam(k, v)
-			}
+		if route != nil {
+			c.SetHandlers(route.Handlers)
+		} else {
+			c.SetHandlers([]core.Handler{handler})
 		}
 
 		if a.pubsub != nil {
@@ -173,10 +198,6 @@ func (a *App) Handler() fasthttp.RequestHandler {
 		}
 		if a.queue != nil {
 			c.SetQueue(a.queue)
-		}
-
-		if route != nil {
-			a.routes = append(a.routes, route)
 		}
 
 		c.Next()
@@ -196,10 +217,14 @@ func (a *App) Add(methods []string, path string, h core.Handler, hs ...core.Hand
 	handlers = append(handlers, h)
 	handlers = append(handlers, hs...)
 
+	handlerChain := make([]core.Handler, len(a.middleware)+len(handlers))
+	copy(handlerChain, a.middleware)
+	copy(handlerChain[len(a.middleware):], handlers)
+
 	route := &router.Route{
 		Path:     path,
 		Method:   methods[0],
-		Handlers: append(a.middleware, handlers...),
+		Handlers: handlerChain,
 		Options:  router.RouteOptions{Disable: true},
 	}
 	a.routes = append(a.routes, route)

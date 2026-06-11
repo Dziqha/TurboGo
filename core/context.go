@@ -57,19 +57,15 @@ func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handle
 	c.aborted = false
 
 	if c.params == nil {
-		c.params = make(map[string]string)
+		c.params = make(map[string]string, 4)
 	} else {
-		for k := range c.params {
-			delete(c.params, k)
-		}
+		clear(c.params)
 	}
 
 	if c.values == nil {
-		c.values = make(map[string]any)
+		c.values = make(map[string]any, 2)
 	} else {
-		for k := range c.values {
-			delete(c.values, k)
-		}
+		clear(c.values)
 	}
 
 	if c.Writer == nil {
@@ -92,12 +88,8 @@ func ReleaseContext(c *Context) {
 	c.aborted = false
 	c.index = -1
 
-	for k := range c.params {
-		delete(c.params, k)
-	}
-	for k := range c.values {
-		delete(c.values, k)
-	}
+	clear(c.params)
+	clear(c.values)
 
 	contextPool.Put(c)
 }
@@ -106,9 +98,27 @@ func NewEngineContext() *EngineContext {
 	return &EngineContext{}
 }
 
+func (c *Context) Params() map[string]string {
+	return c.params
+}
+
+func (c *Context) SetHandlers(h []Handler) {
+	c.handlers = h
+	c.index = -1
+}
+
 func (c *Context) Next() {
 	c.index++
-	for c.index < len(c.handlers) {
+	n := len(c.handlers)
+	if n == 0 {
+		return
+	}
+	if n == 1 && !c.aborted {
+		c.handlers[0](c)
+		c.index++
+		return
+	}
+	for c.index < n {
 		if c.aborted {
 			break
 		}

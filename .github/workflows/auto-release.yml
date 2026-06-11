@@ -1,9 +1,17 @@
-name: TurboGo Auto Release
+name: TurboGo Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 permissions:
   contents: write
   pull-requests: write
@@ -32,21 +40,10 @@ jobs:
           if [ -z "$TAG" ]; then TAG="v0.0.0"; fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Detect version bump type
+      - name: Use manual version bump
         id: version_type
         run: |
-          MSG=$(git log -1 --pretty=%B)
-          if echo "$MSG" | grep -q "BREAKING CHANGE"; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif echo "$MSG" | grep -q "^feat!:" || echo "$MSG" | grep -q "^feat.*!"; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif echo "$MSG" | grep -q "^feat:"; then
-            echo "type=minor" >> $GITHUB_OUTPUT
-          elif echo "$MSG" | grep -q "^fix:"; then
-            echo "type=patch" >> $GITHUB_OUTPUT
-          else
-            echo "type=patch" >> $GITHUB_OUTPUT
-          fi
+          echo "type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
 
       - name: Bump version (safe fallback)
         id: bump
