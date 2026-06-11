@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,7 +12,7 @@ import (
 
 var pool *pgxpool.Pool
 
-func initDB() {
+func getDBConnStr() string {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
 		host := getEnv("DBHOST", "localhost")
@@ -21,14 +22,33 @@ func initDB() {
 		dbname := getEnv("DBNAME", "hello_world")
 		connStr = fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, pass, host, port, dbname)
 	}
+	return connStr
+}
 
+func initDB() {
+	connStr := getDBConnStr()
+
+	var p *pgxpool.Pool
 	var err error
-	pool, err = pgxpool.New(context.Background(), connStr)
-	if err != nil {
-		panic("failed to connect to database: " + err.Error())
-	}
+	for i := 0; i < 30; i++ {
+		p, err = pgxpool.New(context.Background(), connStr)
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+		p.Config().MaxConns = 64
 
-	pool.Config().MaxConns = 64
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err = p.Ping(ctx)
+		cancel()
+		if err == nil {
+			pool = p
+			return
+		}
+		p.Close()
+		time.Sleep(time.Second)
+	}
+	panic("failed to connect to database after 30 retries")
 }
 
 func batchExec(worlds []World) {
