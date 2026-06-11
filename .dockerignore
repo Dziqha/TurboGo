@@ -1,0 +1,12 @@
+.git/
+.gitignore
+.gitattributes
+*.md
+.DS_Store
+.vscode/
+.idea/
+*.exe
+*.exe~
+*.test
+*.out
+turbo-bench.exe

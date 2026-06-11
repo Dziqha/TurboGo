@@ -7,7 +7,11 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY *.go ./
+COPY turbo-bench/ ./turbo-bench/
+COPY core/ ./core/
+COPY internal/ ./internal/
+COPY middleware/ ./middleware/
 RUN CGO_ENABLED=0 go build -o /server -ldflags="-s -w" ./turbo-bench/
 
 FROM alpine:3.21

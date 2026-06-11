@@ -5,9 +5,35 @@ import (
 	"math/rand/v2"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/Dziqha/TurboGo/core"
 )
+
+var idPool = sync.Pool{
+	New: func() any {
+		s := make([]int32, 0, 512)
+		return &s
+	},
+}
+
+func randIDs(n int) []int32 {
+	ptr := idPool.Get().(*[]int32)
+	s := *ptr
+	if cap(s) < n {
+		s = make([]int32, n)
+	}
+	s = s[:n]
+	for i := range s {
+		s[i] = int32(rand.IntN(10000) + 1)
+	}
+	return s
+}
+
+func putIDs(s []int32) {
+	s = s[:0]
+	idPool.Put(&s)
+}
 
 func PlaintextHandler(c *core.Context) {
 	c.Ctx.SetContentType("text/plain")
@@ -54,16 +80,13 @@ func QueriesHandler(c *core.Context) {
 		n = 1
 	}
 
-	worlds := make([]World, n)
-	for i := 0; i < n; i++ {
-		id := int32(rand.IntN(10000) + 1)
-		err := pool.QueryRow(context.Background(),
-			"SELECT id, randomNumber FROM World WHERE id = $1", id,
-		).Scan(&worlds[i].ID, &worlds[i].RandomNumber)
-		if err != nil {
-			c.Ctx.SetStatusCode(500)
-			return
-		}
+	ids := randIDs(n)
+	defer putIDs(ids)
+
+	worlds, err := fetchWorlds(ids)
+	if err != nil {
+		c.Ctx.SetStatusCode(500)
+		return
 	}
 
 	c.JSON(200, worlds)
@@ -114,16 +137,16 @@ func UpdateHandler(c *core.Context) {
 		n = 1
 	}
 
-	worlds := make([]World, n)
-	for i := 0; i < n; i++ {
-		id := int32(rand.IntN(10000) + 1)
-		err := pool.QueryRow(context.Background(),
-			"SELECT id, randomNumber FROM World WHERE id = $1", id,
-		).Scan(&worlds[i].ID, &worlds[i].RandomNumber)
-		if err != nil {
-			c.Ctx.SetStatusCode(500)
-			return
-		}
+	ids := randIDs(n)
+	defer putIDs(ids)
+
+	worlds, err := fetchWorlds(ids)
+	if err != nil {
+		c.Ctx.SetStatusCode(500)
+		return
+	}
+
+	for i := range worlds {
 		worlds[i].RandomNumber = int32(rand.IntN(10000) + 1)
 	}
 
