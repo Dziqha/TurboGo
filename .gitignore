@@ -3,3 +3,13 @@
 *.exe
 *.sql
 *~
+*.log
+*.bak
+benchmark_results_*.json
+bench/bin/
+bench/results/raw/
+bench/results/logs/
+bench/results/*.log
+cpu.prof
+mem.prof
+coverage.out

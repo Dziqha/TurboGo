@@ -1,0 +1,87 @@
+name: Bench (free CI, no VPS)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/turbo-bench]
+    paths:
+      - 'app.go'
+      - 'core/**'
+      - 'internal/router/**'
+      - 'turbo-bench/**'
+      - 'bench/**'
+      - '.github/workflows/bench.yml'
+
+jobs:
+  router-micro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: Router micro bench (publishable)
+        run: |
+          go test ./internal/router -bench=. -benchtime=100000x -benchmem -run='^$' | tee router-bench.txt
+          go version >> router-bench.txt
+          uname -a >> router-bench.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: router-bench
+          path: router-bench.txt
+
+  http-quick:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hello_world
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: Install wrk
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq wrk
+      - name: Seed DB
+        run: psql "host=localhost user=postgres password=postgres dbname=hello_world sslmode=disable" -f turbo-bench/seed.sql
+        env:
+          PGPASSWORD: postgres
+      - name: Build turbogo + fiber comparator
+        run: |
+          go build -o /tmp/opencode/turbogo ./turbo-bench/
+          go build -o /tmp/opencode/fiber ./deploy/tfb/fiber-main.go || echo "fiber comparator optional"
+      - name: Quick wrk (5s, c64, no full matrix)
+        run: |
+          DATABASE_URL="host=localhost user=postgres password=postgres dbname=hello_world sslmode=disable" PORT=8080 /tmp/opencode/turbogo >/tmp/opencode/turbogo.log 2>&1 &
+          for i in $(seq 1 50); do curl -sf http://127.0.0.1:8080/plaintext >/dev/null 2>&1 && break; sleep 0.2; done
+          for ep in plaintext json user/42 db "queries?queries=20" fortunes "update?queries=20"; do
+            echo "== /$ep =="
+            wrk -t2 -c64 -d5s --latency --timeout 5s "http://127.0.0.1:8080/$ep" 2>&1 | grep -E "Requests/sec|Latency|50%|99%|Socket errors|Non-2xx" || true
+          done | tee ci-bench.txt
+          go version >> ci-bench.txt
+          uname -a >> ci-bench.txt
+          kill %1 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-bench
+          path: ci-bench.txt
+
+  tfb-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate TFB files
+        run: |
+          python3 -c "import json; json.load(open('deploy/tfb/benchmark_config.json')); print('benchmark_config.json OK')"
+          docker build -f deploy/tfb/Dockerfile -t turbogo-tfb-check .
+          echo "Dockerfile builds OK"
