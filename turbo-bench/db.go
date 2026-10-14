@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,12 +31,15 @@ func initDB() {
 	var p *pgxpool.Pool
 	var err error
 	for i := 0; i < 30; i++ {
-		p, err = pgxpool.New(context.Background(), connStr)
+		cfg, err := pgxpool.ParseConfig(connStr)
+		if err == nil {
+			cfg.MaxConns = 12
+			p, err = pgxpool.NewWithConfig(context.Background(), cfg)
+		}
 		if err != nil {
 			time.Sleep(time.Second)
 			continue
 		}
-		p.Config().MaxConns = 64
 		pool = p
 		return
 	}
@@ -70,13 +73,22 @@ func fetchWorlds(ids []int32) ([]World, error) {
 
 func batchExec(worlds []World) {
 	ctx := context.Background()
-	batch := &pgx.Batch{}
-	for _, w := range worlds {
-		batch.Queue("UPDATE World SET randomNumber = $1 WHERE id = $2",
-			w.RandomNumber, w.ID)
+	var q strings.Builder
+	q.WriteString("UPDATE World SET randomNumber = CASE id")
+	args := make([]any, 0, len(worlds)*2)
+	for i, w := range worlds {
+		q.WriteString(fmt.Sprintf(" WHEN $%d::int THEN $%d::int", i*2+1, i*2+2))
+		args = append(args, w.ID, w.RandomNumber)
 	}
-	br := pool.SendBatch(ctx, batch)
-	br.Close()
+	q.WriteString(" END WHERE id IN (")
+	for i := range worlds {
+		if i > 0 {
+			q.WriteString(",")
+		}
+		q.WriteString(fmt.Sprintf("$%d::int", i*2+1))
+	}
+	q.WriteString(")")
+	pool.Exec(ctx, q.String(), args...)
 }
 
 func getEnv(key, fallback string) string {

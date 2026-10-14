@@ -2,8 +2,14 @@ package core
 
 import (
 	"encoding/json"
+	"html/template"
+	"io"
+	"mime/multipart"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/Dziqha/TurboGo/internal/cache"
 	"github.com/Dziqha/TurboGo/internal/concurrency"
@@ -15,16 +21,17 @@ import (
 
 type Handler func(*Context)
 type Context struct {
-	Ctx      *fasthttp.RequestCtx
-	Cache    *cache.Engine
-	Pubsub   *pubsub.Engine
-	Queue    *queue.Engine
-	index    int
-	handlers []Handler
-	aborted  bool
-	values   map[string]any // untuk menyimpan session atau data lainnya
-	Writer   *strings.Builder
-	params   map[string]string // untuk route parameters
+	Ctx       *fasthttp.RequestCtx
+	Cache     *cache.Engine
+	Pubsub    *pubsub.Engine
+	Queue     *queue.Engine
+	Templates *template.Template
+	index     atomic.Int32
+	handlers  []Handler
+	aborted   atomic.Bool
+	values    map[string]any
+	Writer    *strings.Builder
+	params    map[string]string
 }
 
 type EngineContext struct {
@@ -35,7 +42,7 @@ type EngineContext struct {
 var contextPool = sync.Pool{
 	New: func() any {
 		builder := &strings.Builder{}
-		builder.Grow(512) // Pre-allocate 512 bytes capacity
+		builder.Grow(512)
 		return &Context{
 			Writer: builder,
 			params: make(map[string]string),
@@ -47,33 +54,24 @@ var contextPool = sync.Pool{
 func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handler) *Context {
 	c := contextPool.Get().(*Context)
 
-	// Reset semua field
 	c.Ctx = ctx
 	c.Cache = cache
 	c.Pubsub = nil
 	c.Queue = nil
-	c.index = -1 // agar Next() mulai dari index 0
+	c.Templates = nil
+	c.index.Store(-1)
 	c.handlers = handlers
-	c.aborted = false
+	c.aborted.Store(false)
 
-	if c.params == nil {
-		c.params = make(map[string]string, 4)
-	} else {
-		clear(c.params)
-	}
-
-	if c.values == nil {
-		c.values = make(map[string]any, 2)
-	} else {
-		clear(c.values)
-	}
+	clear(c.params)
+	clear(c.values)
 
 	if c.Writer == nil {
 		builder := &strings.Builder{}
-		builder.Grow(512) // Pre-allocate 512 bytes capacity
+		builder.Grow(512)
 		c.Writer = builder
 	} else {
-		c.Writer.Reset() // Reset writer untuk reuse
+		c.Writer.Reset()
 	}
 
 	return c
@@ -84,12 +82,10 @@ func ReleaseContext(c *Context) {
 	c.Cache = nil
 	c.Pubsub = nil
 	c.Queue = nil
+	c.Templates = nil
 	c.handlers = nil
-	c.aborted = false
-	c.index = -1
-
-	clear(c.params)
-	clear(c.values)
+	c.aborted.Store(false)
+	c.index.Store(-1)
 
 	contextPool.Put(c)
 }
@@ -104,30 +100,29 @@ func (c *Context) Params() map[string]string {
 
 func (c *Context) SetHandlers(h []Handler) {
 	c.handlers = h
-	c.index = -1
+	c.index.Store(-1)
 }
 
 func (c *Context) Next() {
-	c.index++
+	c.index.Add(1)
 	n := len(c.handlers)
 	if n == 0 {
 		return
 	}
-	if n == 1 && !c.aborted {
+	if n == 1 && c.index.Load() == 0 && !c.aborted.Load() {
 		c.handlers[0](c)
-		c.index++
+		c.index.Add(1)
 		return
 	}
-	for c.index < n {
-		if c.aborted {
+	for c.index.Load() < int32(n) {
+		if c.aborted.Load() {
 			break
 		}
-		c.handlers[c.index](c)
-		c.index++
+		c.handlers[c.index.Load()](c)
+		c.index.Add(1)
 	}
 }
 
-// JSON writes a JSON response
 func (c *Context) JSON(status int, data any) {
 	c.Ctx.SetStatusCode(status)
 	c.Ctx.SetContentType("application/json")
@@ -162,12 +157,10 @@ func (c *Context) Param(key string) string {
 	return ""
 }
 
-// Query returns a query parameter
 func (c *Context) Query(key string) string {
 	return string(c.Ctx.QueryArgs().Peek(key))
 }
 
-// Body binds JSON body to a struct
 func (c *Context) BindJSON(dest any) error {
 	return json.Unmarshal(c.Ctx.PostBody(), dest)
 }
@@ -177,11 +170,11 @@ func (c *Context) Header(key string) string {
 }
 
 func (c *Context) Abort() {
-	c.aborted = true
+	c.aborted.Store(true)
 }
 
 func (c *Context) Aborted() bool {
-	return c.aborted
+	return c.aborted.Load()
 }
 
 func (c *Context) Async(fn func()) {
@@ -194,7 +187,7 @@ func (c *Context) Parallel(funcs ...func()) {
 
 func (c *Context) SetSession(key string, value any) {
 	if c.values == nil {
-		c.values = make(map[string]any)
+		c.values = make(map[string]any, 2)
 	}
 	c.values[key] = value
 }
@@ -253,9 +246,82 @@ func (c *Context) SendString(s string) *Context {
 }
 
 func (c *Context) GetAllParams() map[string]string {
-	result := make(map[string]string)
+	result := make(map[string]string, len(c.params))
 	for k, v := range c.params {
 		result[k] = v
 	}
 	return result
+}
+
+func (c *Context) SetParams(p map[string]string) {
+	clear(c.params)
+	for k, v := range p {
+		c.params[k] = v
+		if c.Ctx != nil {
+			c.Ctx.SetUserValue(k, v)
+		}
+	}
+}
+
+func (c *Context) Redirect(status int, url string) {
+	c.Ctx.Redirect(url, status)
+}
+
+func (c *Context) SetCookie(cookie *fasthttp.Cookie) {
+	c.Ctx.Response.Header.SetCookie(cookie)
+}
+
+func (c *Context) Cookie(name string) string {
+	return string(c.Ctx.Request.Header.Cookie(name))
+}
+
+func (c *Context) DeleteCookie(name string) {
+	cookie := fasthttp.AcquireCookie()
+	cookie.SetKey(name)
+	cookie.SetValue("")
+	cookie.SetPath("/")
+	cookie.SetExpire(time.Unix(0, 0))
+	c.Ctx.Response.Header.SetCookie(cookie)
+	fasthttp.ReleaseCookie(cookie)
+}
+
+func (c *Context) FormFile(key string) (*multipart.FileHeader, error) {
+	return c.Ctx.FormFile(key)
+}
+
+func (c *Context) SaveFile(fh *multipart.FileHeader, dst string) error {
+	src, err := fh.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, src)
+	return err
+}
+
+func (c *Context) MultipartForm() (*multipart.Form, error) {
+	return c.Ctx.MultipartForm()
+}
+
+func (c *Context) HTML(status int, name string, data any) {
+	c.Ctx.SetStatusCode(status)
+	c.Ctx.SetContentType("text/html; charset=utf-8")
+
+	if c.Templates == nil {
+		c.Ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		c.Ctx.SetBodyString("templates are not loaded")
+		return
+	}
+
+	if err := c.Templates.ExecuteTemplate(c.Ctx.Response.BodyWriter(), name, data); err != nil {
+		c.Ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		c.Ctx.SetBodyString("failed to render template: " + err.Error())
+	}
 }

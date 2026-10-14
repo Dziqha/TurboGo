@@ -165,7 +165,7 @@ func TestContext_SetHandlers(t *testing.T) {
 	h2 := func(c *Context) {}
 
 	c.SetHandlers([]Handler{h1, h2})
-	assert.Equal(t, -1, c.index)
+	assert.Equal(t, int32(-1), c.index.Load())
 }
 
 func TestContext_SetQueueAndMustQueue(t *testing.T) {

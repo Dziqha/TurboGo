@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/Dziqha/TurboGo/core"
+	"github.com/valyala/fasthttp"
 )
 
 type Route struct {
 	Method   string
 	Path     string
 	Name     string
-	Handlers []core.Handler
-	Options  RouteOptions
+	Handlers   []core.Handler
+	Options    RouteOptions
+	FastHandler fasthttp.RequestHandler
 }
 
 type RouteOptions struct {
@@ -103,6 +105,27 @@ func (r *SingleThreadedRouter) AddStatic(method, path string, handler core.Handl
 	r.tree.insert(method, path, handler, route)
 }
 
+func (r *SingleThreadedRouter) AddStaticFast(method, path string, fastHandler fasthttp.RequestHandler) *Route {
+	route := &Route{
+		Method:      method,
+		Path:        path,
+		FastHandler: fastHandler,
+	}
+	switch method {
+	case "GET":
+		r.staticGET[path] = &FastRoute{handler: nil, route: route}
+	case "POST":
+		r.staticPOST[path] = &FastRoute{handler: nil, route: route}
+	case "PUT":
+		r.staticPUT[path] = &FastRoute{handler: nil, route: route}
+	case "DELETE":
+		r.staticDELETE[path] = &FastRoute{handler: nil, route: route}
+	default:
+		r.staticOther[method+":"+path] = &FastRoute{handler: nil, route: route}
+	}
+	return route
+}
+
 func (r *SingleThreadedRouter) AddWildcard(method, prefix string, handler core.Handler, route *Route) {
 	r.tree.insert(method, prefix+"*", handler, route)
 }
@@ -112,6 +135,19 @@ func (r *SingleThreadedRouter) AddParametric(method, pattern string, handler cor
 }
 
 func (r *SingleThreadedRouter) Find(method, path string, params map[string]string) (core.Handler, *Route) {
+	if method == "HEAD" {
+		if h, rt := r.find("HEAD", path, params); rt != nil {
+			return h, rt
+		}
+		if h, rt := r.find("GET", path, params); rt != nil {
+			return h, rt
+		}
+		return r.notFoundOrNotAllowed(path)
+	}
+	return r.find(method, path, params)
+}
+
+func (r *SingleThreadedRouter) find(method, path string, params map[string]string) (core.Handler, *Route) {
 	switch method {
 	case "GET":
 		if fr := r.staticGET[path]; fr != nil {
@@ -140,11 +176,36 @@ func (r *SingleThreadedRouter) Find(method, path string, params map[string]strin
 		return handler, route
 	}
 
+	return r.notFoundOrNotAllowed(path)
+}
+
+func (r *SingleThreadedRouter) notFoundOrNotAllowed(path string) (core.Handler, *Route) {
 	if r.tree.pathExistsAny(path) {
 		return r.methodNotAllowedHandler, nil
 	}
-
 	return r.notFoundHandler, nil
+}
+
+func (r *SingleThreadedRouter) SetNotFoundHandler(h core.Handler) {
+	if h != nil {
+		r.notFoundHandler = h
+	}
+}
+
+func (r *SingleThreadedRouter) SetMethodNotAllowedHandler(h core.Handler) {
+	if h != nil {
+		r.methodNotAllowedHandler = h
+	}
+}
+
+func (r *SingleThreadedRouter) AddFastRoute(method, path string, fastHandler fasthttp.RequestHandler) *Route {
+	route := &Route{
+		Method:      method,
+		Path:        path,
+		FastHandler: fastHandler,
+	}
+	r.tree.insert(method, path, nil, route)
+	return route
 }
 
 func (r *SingleThreadedRouter) Reset() {

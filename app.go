@@ -1,11 +1,18 @@
 package TurboGo
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
+	"os"
+	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -14,7 +21,6 @@ import (
 	"github.com/Dziqha/TurboGo/internal/pubsub"
 	"github.com/Dziqha/TurboGo/internal/queue"
 	"github.com/Dziqha/TurboGo/internal/router"
-	"github.com/fatih/color"
 	"github.com/valyala/fasthttp"
 )
 
@@ -55,6 +61,9 @@ type App struct {
 	cache        *cache.Engine
 	pubsub       *pubsub.Engine
 	queue        *queue.Engine
+	templates    *template.Template
+	srv          *fasthttp.Server
+	ErrorHandler func(*core.Context, error)
 }
 
 type Group struct {
@@ -85,60 +94,14 @@ func (a *App) WithCache() *App {
 
 func (a *App) Use(args ...any) *App {
 	for _, arg := range args {
-		if h, ok := arg.(core.Handler); ok {
+		switch h := arg.(type) {
+		case core.Handler:
 			a.middleware = append(a.middleware, h)
+		case func(*core.Context):
+			a.middleware = append(a.middleware, core.Handler(h))
 		}
 	}
 	return a
-}
-
-func loggerWrap(c *core.Context, _ []core.Handler) {
-	if core.DisableLogger {
-		return
-	}
-
-	status := c.Ctx.Response.StatusCode()
-	if status == 0 {
-		if c.Aborted() {
-			status = fasthttp.StatusUnauthorized
-		} else {
-			status = fasthttp.StatusOK
-		}
-		c.Ctx.SetStatusCode(status)
-	}
-
-	method := string(c.Ctx.Method())
-	path := string(c.Ctx.Path())
-	timestamp := time.Now().Format("15:04:05")
-
-	var statusColor *color.Color
-
-	switch {
-	case status >= 200 && status < 300:
-		statusColor = color.New(color.FgGreen)
-	case status >= 300 && status < 400:
-		statusColor = color.New(color.FgCyan)
-	case status >= 400 && status < 500:
-		statusColor = color.New(color.FgYellow)
-	default:
-		statusColor = color.New(color.FgRed)
-	}
-
-	methodColor := color.New(color.FgMagenta).SprintFunc()
-	timeColor := color.New(color.FgBlue).SprintFunc()
-	statusStr := statusColor.Sprintf("%d", status)
-
-	fmt.Printf("🌀 TurboGo [%s] %s %s [%s]\n",
-		timeColor(timestamp),
-		methodColor(method),
-		path,
-		statusStr,
-	)
-
-}
-
-func loggerMiddleware(c *core.Context) {
-	loggerWrap(c, nil)
 }
 
 func (a *App) Route(path string) *router.Route {
@@ -150,13 +113,9 @@ func (a *App) Route(path string) *router.Route {
 	return nil
 }
 
-func (a *App) RunServer(addr string) error {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	fmt.Println(Banner(addr))
-
+func (a *App) newServer() *fasthttp.Server {
 	srv := &fasthttp.Server{
 		Handler:                       a.Handler(),
-		Name:                          "TurboGo",
 		Logger:                        log.New(io.Discard, "", 0),
 		LogAllErrors:                  false,
 		ReadBufferSize:                4096,
@@ -169,13 +128,56 @@ func (a *App) RunServer(addr string) error {
 		ReduceMemoryUsage:             false,
 		NoDefaultServerHeader:         true,
 		NoDefaultDate:                 true,
-		NoDefaultContentType:          false,
+		NoDefaultContentType:          true,
 		DisableHeaderNamesNormalizing: true,
 		DisablePreParseMultipartForm:  true,
 		StreamRequestBody:             false,
 		GetOnly:                       false,
 	}
-	return srv.ListenAndServe(addr)
+	a.srv = srv
+	return srv
+}
+
+func (a *App) RunServer(addr string) error {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	fmt.Println(Banner(addr))
+	return a.newServer().ListenAndServe(addr)
+}
+
+func (a *App) RunTLSServer(addr, certFile, keyFile string) error {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	fmt.Println(Banner(addr))
+	return a.newServer().ListenAndServeTLS(addr, certFile, keyFile)
+}
+
+func (a *App) Shutdown(ctx context.Context) error {
+	if a.srv == nil {
+		return errors.New("server is not running")
+	}
+	return a.srv.ShutdownWithContext(ctx)
+}
+
+func (a *App) RunWithGracefulShutdown(addr string) error {
+	errCh := make(chan error, 1)
+	go func() {
+		if err := a.RunServer(addr); err != nil {
+			errCh <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-quit:
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return a.Shutdown(shutdownCtx)
 }
 
 func (a *App) Handler() fasthttp.RequestHandler {
@@ -184,25 +186,63 @@ func (a *App) Handler() fasthttp.RequestHandler {
 		path := b2s(ctx.Path())
 
 		c := core.NewContext(ctx, a.cache, nil)
+		c.Templates = a.templates
+		defer core.ReleaseContext(c)
 
+		defer func() {
+			if rec := recover(); rec != nil {
+				if err, ok := rec.(error); ok {
+					a.handleError(c, err)
+				} else {
+					a.handleError(c, fmt.Errorf("%v", rec))
+				}
+			}
+		}()
 		handler, route := a.singleRouter.Find(method, path, c.Params())
 
 		if route != nil {
-			c.SetHandlers(route.Handlers)
+			if route.FastHandler != nil {
+				core.ReleaseContext(c)
+				route.FastHandler(ctx)
+				return
+			}
+			hs := route.Handlers
+			if a.pubsub != nil || a.queue != nil {
+				if a.pubsub != nil {
+					c.SetPubsub(a.pubsub)
+				}
+				if a.queue != nil {
+					c.SetQueue(a.queue)
+				}
+			}
+			if len(hs) == 1 {
+				hs[0](c)
+			} else {
+				c.SetHandlers(hs)
+				c.Next()
+			}
 		} else {
 			c.SetHandlers([]core.Handler{handler})
+			c.Next()
 		}
 
-		if a.pubsub != nil {
-			c.SetPubsub(a.pubsub)
+		if method == "HEAD" {
+			ctx.Response.ResetBody()
 		}
-		if a.queue != nil {
-			c.SetQueue(a.queue)
-		}
-
-		c.Next()
-		defer core.ReleaseContext(c)
 	}
+}
+
+func (a *App) handleError(c *core.Context, err error) {
+	if a.ErrorHandler != nil {
+		a.ErrorHandler(c, err)
+		return
+	}
+	c.Error(err)
+}
+
+func (a *App) SetErrorHandler(fn func(*core.Context, error)) *App {
+	a.ErrorHandler = fn
+	return a
 }
 
 func (a *App) Add(methods []string, path string, h core.Handler, hs ...core.Handler) *router.Route {
@@ -237,10 +277,10 @@ func (a *App) Add(methods []string, path string, h core.Handler, hs ...core.Hand
 		finalHandler := func(c *core.Context) {
 			defer func() {
 				if rec := recover(); rec != nil {
-					fmt.Printf("Panic in handler: %v\n", rec)
-					if c != nil && c.Ctx != nil {
-						c.Ctx.SetStatusCode(500)
-						c.Ctx.SetBodyString("Internal Server Error")
+					if err, ok := rec.(error); ok {
+						a.handleError(c, err)
+					} else {
+						a.handleError(c, fmt.Errorf("%v", rec))
 					}
 				}
 			}()
@@ -279,6 +319,76 @@ func (a *App) WithQueue() *App {
 	return a
 }
 
+func (a *App) Static(prefix, dir string) *App {
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+	prefix = strings.TrimSuffix(prefix, "/")
+
+	fs := &fasthttp.FS{
+		Root:               dir,
+		IndexNames:         []string{"index.html"},
+		GenerateIndexPages: false,
+		Compress:           true,
+		CompressBrotli:     true,
+		CacheDuration:      10 * time.Second,
+		PathRewrite: func(ctx *fasthttp.RequestCtx) []byte {
+			p := ctx.Path()
+			if len(p) >= len(prefix) {
+				p = p[len(prefix):]
+			}
+			if len(p) == 0 {
+				p = []byte("/")
+			}
+			return p
+		},
+	}
+	handler := fs.NewRequestHandler()
+
+	a.singleRouter.AddStaticFast("GET", prefix, handler)
+	a.singleRouter.AddFastRoute("GET", prefix+"/", handler)
+	a.singleRouter.AddFastRoute("GET", prefix+"/*", handler)
+	return a
+}
+
+func (a *App) Templates(dir string) *App {
+	if a.templates == nil {
+		a.templates = template.New("")
+	}
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".html") {
+			return nil
+		}
+		name, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		_, err = a.templates.New(filepath.ToSlash(name)).Parse(string(data))
+		return err
+	})
+	if err != nil {
+		panic("failed to load templates: " + err.Error())
+	}
+	return a
+}
+
+func (a *App) NotFound(h core.Handler) *App {
+	a.singleRouter.SetNotFoundHandler(h)
+	return a
+}
+
+func (a *App) MethodNotAllowed(h core.Handler) *App {
+	a.singleRouter.SetMethodNotAllowedHandler(h)
+	return a
+}
+
 func (a *App) WithPubsub() *App {
 	if a.pubsub == nil {
 		ps, err := pubsub.NewEngine()
@@ -294,8 +404,18 @@ func (a *App) WithPubsub() *App {
 func (a *App) WrapHandlers(hs []core.Handler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		c := core.NewContext(ctx, a.cache, hs)
-		c.Next()
+		c.Templates = a.templates
 		defer core.ReleaseContext(c)
+		defer func() {
+			if rec := recover(); rec != nil {
+				if err, ok := rec.(error); ok {
+					a.handleError(c, err)
+				} else {
+					a.handleError(c, fmt.Errorf("%v", rec))
+				}
+			}
+		}()
+		c.Next()
 	}
 }
 
@@ -315,6 +435,10 @@ func (g *Group) Add(methods []string, path string, h core.Handler, hs ...core.Ha
 	allHandlers = append(allHandlers, hs...)
 
 	return g.app.Add(methods, fullPath, allHandlers[0], allHandlers[1:]...)
+}
+
+func (a *App) GetFast(path string, handler fasthttp.RequestHandler) *router.Route {
+	return a.singleRouter.AddStaticFast("GET", path, handler)
 }
 
 // HTTP method shortcuts

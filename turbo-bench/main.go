@@ -14,7 +14,10 @@ func main() {
 	app := TurboGo.New()
 
 	app.Get("/plaintext", PlaintextHandler)
+	app.GetFast("/plaintextfast", PlaintextFast)
 	app.Get("/json", JSONHandler)
+	app.GetFast("/jsonfast", JSONFast)
+	app.Get("/user/:id", UserParamHandler)
 	app.Get("/db", DBHandler)
 	app.Get("/queries", QueriesHandler)
 	app.Get("/fortunes", FortunesHandler)

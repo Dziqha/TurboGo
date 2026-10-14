@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"math/rand/v2"
 	"sort"
 	"strconv"
 	"sync"
 
 	"github.com/Dziqha/TurboGo/core"
+	"github.com/valyala/fasthttp"
 )
 
 var idPool = sync.Pool{
@@ -36,12 +38,29 @@ func putIDs(s []int32) {
 }
 
 func PlaintextHandler(c *core.Context) {
-	c.Ctx.SetContentType("text/plain")
+	c.Ctx.Response.Header.SetContentType("text/plain")
 	c.Ctx.SetBodyString("Hello, World!")
+}
+
+func PlaintextFast(ctx *fasthttp.RequestCtx) {
+	ctx.Response.Header.SetContentType("text/plain")
+	ctx.SetBodyString("Hello, World!")
 }
 
 func JSONHandler(c *core.Context) {
 	c.JSON(200, Message{Message: "Hello, World!"})
+}
+
+func JSONFast(ctx *fasthttp.RequestCtx) {
+	ctx.SetStatusCode(200)
+	ctx.SetContentType("application/json")
+	res, _ := json.Marshal(Message{Message: "Hello, World!"})
+	ctx.SetBody(res)
+}
+
+func UserParamHandler(c *core.Context) {
+	c.Ctx.SetContentType("text/plain")
+	c.Ctx.SetBodyString("user:" + c.Param("id"))
 }
 
 func requireDB(c *core.Context) bool {
@@ -156,7 +175,7 @@ func UpdateHandler(c *core.Context) {
 }
 
 func parseQueryCount(c *core.Context) int {
-	q := c.Ctx.QueryArgs().Peek("q")
+	q := c.Ctx.QueryArgs().Peek("queries")
 	if len(q) == 0 {
 		return 0
 	}
