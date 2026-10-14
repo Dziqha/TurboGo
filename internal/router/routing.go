@@ -167,6 +167,79 @@ func (r *SingleThreadedRouter) Find(method, path string, params map[string]strin
 	return r.find(method, path, params)
 }
 
+// FindInto is the zero-alloc lookup used on the request hot path. Matched
+// params land directly in dst slots (no hashing); the return value is their
+// count. overflow carries anything that cannot fit slots: tree-fallback
+// matches and routes with more than core.MaxSlots params. Static,
+// 404 and 405 hits write nothing. Callers must honor n even when the
+// overflow map is non-empty (both can hold values after a fallback match).
+func (r *SingleThreadedRouter) FindInto(method, path string, dst *[core.MaxSlots]core.ParamSlot, overflow map[string]string) (core.Handler, *Route, int) {
+	if method == "HEAD" {
+		if h, rt, n := r.findInto("HEAD", path, dst, overflow); rt != nil {
+			return h, rt, n
+		}
+		// HEAD falls back to GET: retry into clean sinks.
+		if overflow != nil {
+			for k := range overflow {
+				delete(overflow, k)
+			}
+		}
+		return r.findInto("GET", path, dst, overflow)
+	}
+	return r.findInto(method, path, dst, overflow)
+}
+
+func (r *SingleThreadedRouter) findInto(method, path string, dst *[core.MaxSlots]core.ParamSlot, overflow map[string]string) (core.Handler, *Route, int) {
+	// mi mirrors methodIdx; treeOnly forces tree search for unknown methods
+	// (tree aliases them to the GET slot, which the tables don't replicate).
+	mi := 0
+	treeOnly := false
+	switch method {
+	case "GET":
+		if fr := r.staticGET[path]; fr != nil {
+			return fr.handler, fr.route, 0
+		}
+		mi = 0
+	case "POST":
+		if fr := r.staticPOST[path]; fr != nil {
+			return fr.handler, fr.route, 0
+		}
+		mi = 1
+	case "PUT":
+		if fr := r.staticPUT[path]; fr != nil {
+			return fr.handler, fr.route, 0
+		}
+		mi = 2
+	case "DELETE":
+		if fr := r.staticDELETE[path]; fr != nil {
+			return fr.handler, fr.route, 0
+		}
+		mi = 3
+	default:
+		if fr := r.staticOther[method+":"+path]; fr != nil {
+			return fr.handler, fr.route, 0
+		}
+		var ok bool
+		mi, ok = methodIndex(method)
+		treeOnly = !ok
+	}
+
+	if r.compiledOn && !treeOnly {
+		if r.compiled != nil {
+			return r.findIntoCompiled(method, mi, path, dst, overflow)
+		}
+	}
+
+	h, rt, ok := r.tree.search(method, path, overflow)
+	if ok {
+		// Tree writes the overflow map directly; slots stay empty.
+		// Callers consult both (Param checks slots, then map).
+		return h, rt, 0
+	}
+	h, rt = r.notFoundOrNotAllowed(path)
+	return h, rt, 0
+}
+
 func (r *SingleThreadedRouter) find(method, path string, params map[string]string) (core.Handler, *Route) {
 	// mi mirrors methodIdx; treeOnly forces tree search for unknown methods
 	// (tree aliases them to the GET slot, which the tables don't replicate).
@@ -214,10 +287,72 @@ func (r *SingleThreadedRouter) find(method, path string, params map[string]strin
 	return r.notFoundOrNotAllowed(path)
 }
 
-// findCompiled is the compiled-switch fast path. The decision tree mirrors
-// the radix tree 1:1, so matches are exact; misses fall back to the tree,
-// making results exact by construction (including prefix-split quirks and
-// FastHandler routes absent from the tree).
+// findIntoCompiled mirrors findCompiled with slot sinks: the decision
+// search fills stack offsets, and only the winner is materialized —
+// directly into dst, never through a map.
+func (r *SingleThreadedRouter) findIntoCompiled(method string, mi int, path string, dst *[core.MaxSlots]core.ParamSlot, overflow map[string]string) (core.Handler, *Route, int) {
+	if r.dirty {
+		r.compiled = r.Compile()
+		r.dirty = false
+	}
+	comp := r.compiled
+	var bestP *cLeaf
+	var slots [maxSegs][2]int
+	if comp.root != nil {
+		// pos=1 mirrors tree.search entry (path[0] is '/' in practice).
+		leaf, ovf := comp.root.search(path, 1, 0, mi, &slots)
+		if ovf {
+			// Path too deep for slots: nothing was written anywhere.
+			if h, rt, ok := r.tree.search(method, path, overflow); ok {
+				return h, rt, 0
+			}
+		} else if leaf != nil {
+			bestP = leaf
+		}
+	}
+
+	var bestW *cWildcard
+	for _, w := range comp.wild[mi] {
+		if len(path) > len(w.prefix) && strings.HasPrefix(path, w.prefix) {
+			bestW = w
+			break
+		}
+	}
+
+	if bestP != nil && (bestW == nil || bestP.ord < bestW.ord) {
+		if len(bestP.names) > len(dst) {
+			// More params than slots: exact check via tree into overflow.
+			if h, rt, ok := r.tree.search(method, path, overflow); ok {
+				return h, rt, 0
+			}
+		} else {
+			for i, si := range bestP.pdepths {
+				s, e := slots[si][0], slots[si][1]
+				dst[i] = core.ParamSlot{K: bestP.names[i], V: path[s:e]}
+			}
+			return bestP.handler, bestP.route, len(bestP.names)
+		}
+	}
+	if bestW != nil {
+		dst[0] = core.ParamSlot{K: "*", V: stripSlashPrefix(path[len(bestW.prefix):])}
+		return bestW.handler, bestW.route, 1
+	}
+	// Miss: fall back to the tree for an exact answer.
+	if h, rt, ok := r.tree.search(method, path, overflow); ok {
+		return h, rt, 0
+	}
+	h, rt := r.notFoundOrNotAllowed(path)
+	return h, rt, 0
+}
+
+// stripSlashPrefix mirrors the tree wildcard capture: at most one leading
+// slash is skipped before capturing the remainder.
+func stripSlashPrefix(rest string) string {
+	if len(rest) > 0 && rest[0] == '/' {
+		rest = rest[1:]
+	}
+	return rest
+}
 func (r *SingleThreadedRouter) findCompiled(method string, mi int, path string, params map[string]string) (core.Handler, *Route) {
 	if r.dirty {
 		r.compiled = r.Compile()

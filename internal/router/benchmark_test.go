@@ -1,6 +1,10 @@
 package router
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Dziqha/TurboGo/core"
+)
 
 var benchPaths = []string{
 	"/",
@@ -194,5 +198,62 @@ func BenchmarkRouter_CompiledStatic(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		r.Find("GET", scaleStaticPaths[i%len(scaleStaticPaths)], nil)
+	}
+}
+
+// ===== S0 skewed baseline: 90% hot param path, 10% spread =====
+// Hot path is the LAST-registered prefix so cold order scans it last.
+
+func BenchmarkRouter_SkewedParam(b *testing.B) {
+	r := prepareScaleRouter()
+	p := make(map[string]string)
+	hot := scaleParamPaths[len(scaleParamPaths)-1][1]
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if i%10 == 0 {
+			pp := scaleParamPaths[(i/10)%len(scaleParamPaths)]
+			r.Find("GET", pp[1], p)
+		} else {
+			r.Find("GET", hot, p)
+		}
+		for k := range p {
+			delete(p, k)
+		}
+	}
+}
+
+func BenchmarkRouter_SkewedParamCompiled(b *testing.B) {
+	r := prepareCompiledRouter()
+	p := make(map[string]string)
+	hot := scaleParamPaths[len(scaleParamPaths)-1][1]
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if i%10 == 0 {
+			pp := scaleParamPaths[(i/10)%len(scaleParamPaths)]
+			r.Find("GET", pp[1], p)
+		} else {
+			r.Find("GET", hot, p)
+		}
+		for k := range p {
+			delete(p, k)
+		}
+	}
+}
+
+func BenchmarkFindInto_ScaleParam(b *testing.B) {
+	r := prepareScaleRouter()
+	r.SetCompiled(true)
+	var dst [core.MaxSlots]core.ParamSlot
+	ovf := map[string]string{}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp := scaleParamPaths[i%len(scaleParamPaths)]
+		for k := range ovf {
+			delete(ovf, k)
+		}
+		r.FindInto("GET", pp[1], &dst, ovf)
 	}
 }

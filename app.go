@@ -201,7 +201,8 @@ func (a *App) Handler() fasthttp.RequestHandler {
 				}
 			}
 		}()
-		handler, route := a.singleRouter.Find(method, path, c.Params())
+		handler, route, nparams := a.singleRouter.FindInto(method, path, c.Pslots(), c.Params())
+		c.SetNparams(nparams)
 
 		if route != nil {
 			if route.FastHandler != nil {

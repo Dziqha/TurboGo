@@ -228,3 +228,64 @@ func TestContext_Writer_Reused(t *testing.T) {
 	c2 := makeCtx()
 	assert.Equal(t, 0, c2.Writer.Len())
 }
+
+func TestContext_SlotsReadPriority(t *testing.T) {
+	c := makeCtx()
+	c.pslots[0] = ParamSlot{K: "id", V: "42"}
+	c.nparams = 1
+	assert.Equal(t, "42", c.Param("id"))
+	assert.Equal(t, "", c.Param("missing"))
+}
+
+func TestContext_SetParamOverridesSlot(t *testing.T) {
+	c := makeCtx()
+	c.pslots[0] = ParamSlot{K: "id", V: "42"}
+	c.nparams = 1
+	c.SetParam("id", "99")
+	assert.Equal(t, "99", c.Param("id"))
+	// Map materialization must prefer the override.
+	assert.Equal(t, "99", c.Params()["id"])
+}
+
+func TestContext_ParamsMaterializesSlots(t *testing.T) {
+	c := makeCtx()
+	c.pslots[0] = ParamSlot{K: "a", V: "1"}
+	c.pslots[1] = ParamSlot{K: "b", V: "2"}
+	c.nparams = 2
+	p := c.Params()
+	assert.Equal(t, "1", p["a"])
+	assert.Equal(t, "2", p["b"])
+	// Idempotent: second call keeps values.
+	assert.Equal(t, "1", c.Params()["a"])
+}
+
+func TestContext_SetParamsClearsSlots(t *testing.T) {
+	c := makeCtx()
+	c.pslots[0] = ParamSlot{K: "id", V: "42"}
+	c.nparams = 1
+	c.SetParams(map[string]string{"x": "1"})
+	assert.Equal(t, "", c.Param("id"))
+	assert.Equal(t, "1", c.Param("x"))
+}
+
+func TestContext_GetAllParamsMergesSlots(t *testing.T) {
+	c := makeCtx()
+	c.pslots[0] = ParamSlot{K: "a", V: "1"}
+	c.nparams = 1
+	c.SetParam("b", "2")
+	all := c.GetAllParams()
+	assert.Equal(t, "1", all["a"])
+	assert.Equal(t, "2", all["b"])
+	assert.Len(t, all, 2)
+}
+
+func TestNewContext_ResetsSlots(t *testing.T) {
+	c := makeCtx()
+	c.pslots[0] = ParamSlot{K: "id", V: "42"}
+	c.nparams = 1
+	ReleaseContext(c)
+	c2 := makeCtx()
+	assert.Equal(t, "", c2.Param("id"))
+	assert.Equal(t, 0, len(c2.GetAllParams()))
+	ReleaseContext(c2)
+}

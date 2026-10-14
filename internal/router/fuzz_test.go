@@ -212,3 +212,109 @@ func TestFuzz_DeepPathOverflow(t *testing.T) {
 	require.Equal(t, ra.Path, rb.Path)
 	require.Equal(t, p, p2)
 }
+
+// runFindInto mirrors runFind through the zero-alloc slot API.
+func runFindInto(r *SingleThreadedRouter, method, path string) fuzzResult {
+	var dst [core.MaxSlots]core.ParamSlot
+	ovf := map[string]string{}
+	h, rt, n := r.FindInto(method, path, &dst, ovf)
+	par := map[string]string{}
+	for i := 0; i < n; i++ {
+		par[dst[i].K] = dst[i].V
+	}
+	for k, v := range ovf {
+		if _, ok := par[k]; !ok {
+			par[k] = v
+		}
+	}
+	fr := fuzzResult{h: hptr(h), par: par}
+	if rt != nil {
+		fr.path = rt.Path
+	}
+	return fr
+}
+
+func TestFuzz_FindIntoMatchesFind(t *testing.T) {
+	for _, compiled := range []bool{false, true} {
+		r1 := buildFuzzRouter()
+		r2 := buildFuzzRouter()
+		if compiled {
+			r2.SetCompiled(true)
+		}
+		methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "TRACE", "PURGE"}
+		paths := []string{
+			"/", "//", "/users/", "/users/42", "/users//42", "/users/42/",
+			"/users/new", "/users/1/posts/2", "/a/b", "/x/y", "/a",
+			"/assets/", "/assets", "/assets/images/logo.png",
+			"/dup/1", "/only-post/9", "/missing", "/api/v1/users",
+			"/api/v9/users", "/api/v1/special", "/deep/nest/level/four/X/five",
+		}
+		rng := rand.New(rand.NewSource(7))
+		alpha := []byte("ab/:*-._~% ")
+		for i := 0; i < 20000; i++ {
+			nseg := rng.Intn(5)
+			p := ""
+			for s := 0; s < nseg; s++ {
+				p += "/"
+				l := rng.Intn(8)
+				for k := 0; k < l; k++ {
+					p += string(alpha[rng.Intn(len(alpha))])
+				}
+			}
+			if p == "" {
+				p = "/"
+			}
+			paths = append(paths, p)
+		}
+		mismatch := 0
+		for _, m := range methods {
+			for _, p := range paths {
+				a := runFind(r1, m, p)
+				b := runFindInto(r2, m, p)
+				if a.h != b.h || a.path != b.path || !reflect.DeepEqual(a.par, b.par) {
+					mismatch++
+					if mismatch <= 5 {
+						t.Logf("MISMATCH compiled=%v %s %q: map=(h=%x,route=%q,par=%v) slots=(h=%x,route=%q,par=%v)",
+							compiled, m, p, a.h, a.path, a.par, b.h, b.path, b.par)
+					}
+				}
+			}
+		}
+		require.Equal(t, 0, mismatch, "FindInto must match Find (compiled=%v)", compiled)
+	}
+}
+
+func TestFuzz_FindIntoOverflow(t *testing.T) {
+	r := NewSingleThreadedRouter()
+	pat := ""
+	for i := 0; i < 10; i++ {
+		pat += fmt.Sprintf("/p%d/:v%d", i, i)
+	}
+	r.AddParametric("GET", pat, dummyHandler, &Route{Path: pat})
+	r.SetCompiled(true)
+
+	sample := ""
+	for i := 0; i < 10; i++ {
+		sample += fmt.Sprintf("/p%d/x%d", i, i)
+	}
+
+	var dst [core.MaxSlots]core.ParamSlot
+	ovf := map[string]string{}
+	_, rt, n := r.FindInto("GET", sample, &dst, ovf)
+	require.NotNil(t, rt)
+	require.Equal(t, pat, rt.Path)
+	// All 10 params must be visible across slots + overflow map.
+	got := map[string]string{}
+	for i := 0; i < n; i++ {
+		got[dst[i].K] = dst[i].V
+	}
+	for k, v := range ovf {
+		if _, ok := got[k]; !ok {
+			got[k] = v
+		}
+	}
+	require.Len(t, got, 10)
+	for i := 0; i < 10; i++ {
+		require.Equal(t, fmt.Sprintf("x%d", i), got[fmt.Sprintf("v%d", i)])
+	}
+}

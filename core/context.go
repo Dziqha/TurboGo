@@ -20,6 +20,20 @@ import (
 )
 
 type Handler func(*Context)
+
+// ParamSlot is one named path parameter. Route params live here first
+// (written directly by the router, zero hashing); the params map is only
+// materialized when map access is actually needed. See Params().
+type ParamSlot struct {
+	K string
+	V string
+}
+
+// MaxSlots bounds inline param storage (see ParamSlot). Routes with more
+// params spill to the params map via the overflow path (correct, just
+// slower). Exposed for the router's zero-alloc lookup.
+const MaxSlots = 8
+
 type Context struct {
 	Ctx       *fasthttp.RequestCtx
 	Cache     *cache.Engine
@@ -32,6 +46,8 @@ type Context struct {
 	values    map[string]any
 	Writer    *strings.Builder
 	params    map[string]string
+	pslots    [MaxSlots]ParamSlot
+	nparams   int
 }
 
 type EngineContext struct {
@@ -62,6 +78,7 @@ func NewContext(ctx *fasthttp.RequestCtx, cache *cache.Engine, handlers []Handle
 	c.index.Store(-1)
 	c.handlers = handlers
 	c.aborted.Store(false)
+	c.nparams = 0
 
 	clear(c.params)
 	clear(c.values)
@@ -95,7 +112,26 @@ func NewEngineContext() *EngineContext {
 }
 
 func (c *Context) Params() map[string]string {
+	// Materialize slots into the map (map wins on conflict: a handler
+	// SetParam override must survive). Idempotent.
+	for i := 0; i < c.nparams; i++ {
+		k := c.pslots[i].K
+		if _, ok := c.params[k]; !ok {
+			c.params[k] = c.pslots[i].V
+		}
+	}
 	return c.params
+}
+
+// Pslots exposes the inline param slots for zero-alloc router writes.
+// See SingleThreadedRouter.FindInto.
+func (c *Context) Pslots() *[MaxSlots]ParamSlot {
+	return &c.pslots
+}
+
+// SetNparams records how many slots FindInto filled.
+func (c *Context) SetNparams(n int) {
+	c.nparams = n
 }
 
 func (c *Context) SetHandlers(h []Handler) {
@@ -143,6 +179,11 @@ func (c *Context) Text(code int, msg string) {
 }
 
 func (c *Context) Param(key string) string {
+	for i := 0; i < c.nparams; i++ {
+		if c.pslots[i].K == key {
+			return c.pslots[i].V
+		}
+	}
 	if val, exists := c.params[key]; exists {
 		return val
 	}
@@ -225,6 +266,11 @@ func (c *Context) SetPubsub(p *pubsub.Engine) {
 }
 
 func (c *Context) SetParam(key, value string) {
+	for i := 0; i < c.nparams; i++ {
+		if c.pslots[i].K == key {
+			c.pslots[i].V = value
+		}
+	}
 	if c.params == nil {
 		c.params = make(map[string]string)
 	}
@@ -246,9 +292,14 @@ func (c *Context) SendString(s string) *Context {
 }
 
 func (c *Context) GetAllParams() map[string]string {
-	result := make(map[string]string, len(c.params))
+	result := make(map[string]string, len(c.params)+c.nparams)
 	for k, v := range c.params {
 		result[k] = v
+	}
+	for i := 0; i < c.nparams; i++ {
+		if _, ok := result[c.pslots[i].K]; !ok {
+			result[c.pslots[i].K] = c.pslots[i].V
+		}
 	}
 	return result
 }
@@ -261,6 +312,8 @@ func (c *Context) SetParams(p map[string]string) {
 			c.Ctx.SetUserValue(k, v)
 		}
 	}
+	// Full replace: slots are dead.
+	c.nparams = 0
 }
 
 func (c *Context) Redirect(status int, url string) {
