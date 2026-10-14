@@ -73,3 +73,83 @@ func BenchmarkRouter_MultipleRoutes(b *testing.B) {
 		}
 	}
 }
+
+// ===== Large-scale bench (~200 routes, GitHub-API style) =====
+// Baseline oracle for the compiled-switch router (S3 must beat these).
+
+var scaleStaticPaths []string
+var scaleParamPaths [][2]string // {pattern, sample}
+
+func init() {
+	prefixes := []string{"users", "repos", "orgs", "teams", "issues", "pulls", "actions", "packages", "gists", "projects"}
+	for _, p := range prefixes {
+		for i := 0; i < 10; i++ {
+			scaleStaticPaths = append(scaleStaticPaths, "/api/"+p+"/list"+itoa(i))
+		}
+	}
+	for _, p := range prefixes {
+		scaleParamPaths = append(scaleParamPaths,
+			[2]string{"/api/" + p + "/:id", "/api/" + p + "/42"},
+			[2]string{"/api/" + p + "/:id/posts", "/api/" + p + "/42/posts"},
+		)
+	}
+}
+
+func itoa(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	var b [8]byte
+	pos := len(b)
+	for i > 0 {
+		pos--
+		b[pos] = byte('0' + i%10)
+		i /= 10
+	}
+	return string(b[pos:])
+}
+
+func prepareScaleRouter() *SingleThreadedRouter {
+	r := NewSingleThreadedRouter()
+	for _, p := range scaleStaticPaths {
+		r.AddStatic("GET", p, dummyHandler, &Route{Path: p})
+	}
+	for _, pp := range scaleParamPaths {
+		r.AddParametric("GET", pp[0], dummyHandler, &Route{Path: pp[0]})
+	}
+	r.AddStatic("GET", "/users/new", dummyHandler, &Route{Path: "/users/new"})
+	r.AddParametric("GET", "/users/:id", dummyHandler, &Route{Path: "/users/:id"})
+	return r
+}
+
+func BenchmarkRouter_ScaleStatic(b *testing.B) {
+	r := prepareScaleRouter()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Find("GET", scaleStaticPaths[i%len(scaleStaticPaths)], nil)
+	}
+}
+
+func BenchmarkRouter_ScaleParam(b *testing.B) {
+	r := prepareScaleRouter()
+	p := make(map[string]string)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp := scaleParamPaths[i%len(scaleParamPaths)]
+		r.Find("GET", pp[1], p)
+		for k := range p {
+			delete(p, k)
+		}
+	}
+}
+
+func BenchmarkRouter_ScaleStaticBeatsParam(b *testing.B) {
+	r := prepareScaleRouter()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Find("GET", "/users/new", nil)
+	}
+}
