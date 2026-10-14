@@ -153,3 +153,46 @@ func BenchmarkRouter_ScaleStaticBeatsParam(b *testing.B) {
 		r.Find("GET", "/users/new", nil)
 	}
 }
+
+// ===== Compiled-switch variants (flag on) =====
+
+func prepareCompiledRouter() *SingleThreadedRouter {
+	r := prepareScaleRouter()
+	r.SetCompiled(true)
+	return r
+}
+
+func BenchmarkRouter_CompiledParam(b *testing.B) {
+	r := prepareCompiledRouter()
+	p := make(map[string]string)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp := scaleParamPaths[i%len(scaleParamPaths)]
+		r.Find("GET", pp[1], p)
+		for k := range p {
+			delete(p, k)
+		}
+	}
+}
+
+func BenchmarkRouter_CompiledWildcard(b *testing.B) {
+	r := prepareBenchRouter()
+	r.SetCompiled(true)
+	p := make(map[string]string)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Find("GET", "/assets/images/logo.png", p)
+		delete(p, "*")
+	}
+}
+
+func BenchmarkRouter_CompiledStatic(b *testing.B) {
+	r := prepareCompiledRouter()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Find("GET", scaleStaticPaths[i%len(scaleStaticPaths)], nil)
+	}
+}

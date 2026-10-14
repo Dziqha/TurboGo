@@ -49,6 +49,14 @@ type SingleThreadedRouter struct {
 
 	tree *radixTree
 
+	// compiled is the transcribed switch table (see compile.go). It is only
+	// consulted when compiledOn is true; the tree remains the fallback for
+	// anything the table cannot express. dirty marks the table stale after
+	// route changes (lazy recompile on next compiled lookup).
+	compiled   *Compiled
+	compiledOn bool
+	dirty      bool
+
 	notFoundHandler         core.Handler
 	methodNotAllowedHandler core.Handler
 	config                  RouterConfig
@@ -103,6 +111,7 @@ func (r *SingleThreadedRouter) AddStatic(method, path string, handler core.Handl
 		r.staticOther[method+":"+path] = &FastRoute{handler: handler, route: route}
 	}
 	r.tree.insert(method, path, handler, route)
+	r.markDirty()
 }
 
 func (r *SingleThreadedRouter) AddStaticFast(method, path string, fastHandler fasthttp.RequestHandler) *Route {
@@ -123,15 +132,26 @@ func (r *SingleThreadedRouter) AddStaticFast(method, path string, fastHandler fa
 	default:
 		r.staticOther[method+":"+path] = &FastRoute{handler: nil, route: route}
 	}
+	r.markDirty()
 	return route
 }
 
 func (r *SingleThreadedRouter) AddWildcard(method, prefix string, handler core.Handler, route *Route) {
 	r.tree.insert(method, prefix+"*", handler, route)
+	r.markDirty()
 }
 
 func (r *SingleThreadedRouter) AddParametric(method, pattern string, handler core.Handler, route *Route) {
 	r.tree.insert(method, pattern, handler, route)
+	r.markDirty()
+}
+
+// markDirty flags the compiled table stale. The table rebuilds lazily on
+// the next compiled lookup, so bulk registration pays one recompile.
+func (r *SingleThreadedRouter) markDirty() {
+	if r.compiledOn {
+		r.dirty = true
+	}
 }
 
 func (r *SingleThreadedRouter) Find(method, path string, params map[string]string) (core.Handler, *Route) {
@@ -148,27 +168,42 @@ func (r *SingleThreadedRouter) Find(method, path string, params map[string]strin
 }
 
 func (r *SingleThreadedRouter) find(method, path string, params map[string]string) (core.Handler, *Route) {
+	// mi mirrors methodIdx; treeOnly forces tree search for unknown methods
+	// (tree aliases them to the GET slot, which the tables don't replicate).
+	mi := 0
+	treeOnly := false
 	switch method {
 	case "GET":
 		if fr := r.staticGET[path]; fr != nil {
 			return fr.handler, fr.route
 		}
+		mi = 0
 	case "POST":
 		if fr := r.staticPOST[path]; fr != nil {
 			return fr.handler, fr.route
 		}
+		mi = 1
 	case "PUT":
 		if fr := r.staticPUT[path]; fr != nil {
 			return fr.handler, fr.route
 		}
+		mi = 2
 	case "DELETE":
 		if fr := r.staticDELETE[path]; fr != nil {
 			return fr.handler, fr.route
 		}
+		mi = 3
 	default:
 		if fr := r.staticOther[method+":"+path]; fr != nil {
 			return fr.handler, fr.route
 		}
+		var ok bool
+		mi, ok = methodIndex(method)
+		treeOnly = !ok
+	}
+
+	if r.compiledOn && r.compiled != nil && !treeOnly {
+		return r.findCompiled(method, mi, path, params)
 	}
 
 	handler, route, ok := r.tree.search(method, path, params)
@@ -176,6 +211,67 @@ func (r *SingleThreadedRouter) find(method, path string, params map[string]strin
 		return handler, route
 	}
 
+	return r.notFoundOrNotAllowed(path)
+}
+
+// findCompiled is the compiled-switch fast path. The decision tree mirrors
+// the radix tree 1:1, so matches are exact; misses fall back to the tree,
+// making results exact by construction (including prefix-split quirks and
+// FastHandler routes absent from the tree).
+func (r *SingleThreadedRouter) findCompiled(method string, mi int, path string, params map[string]string) (core.Handler, *Route) {
+	if r.dirty {
+		r.compiled = r.Compile()
+		r.dirty = false
+	}
+	var bestP *cLeaf
+	var slots [maxSegs][2]int
+	if r.compiled.root != nil {
+		// pos=1 mirrors tree.search entry (path[0] is '/' in practice).
+		leaf, ovf := r.compiled.root.search(path, 1, 0, mi, &slots)
+		if ovf {
+			// Path too deep for slots: nothing was written to params.
+			if h, rt, ok := r.tree.search(method, path, params); ok {
+				return h, rt
+			}
+		} else if leaf != nil {
+			bestP = leaf
+		}
+	}
+
+	var bestW *cWildcard
+	for _, w := range r.compiled.wild[mi] {
+		if len(path) > len(w.prefix) && strings.HasPrefix(path, w.prefix) {
+			bestW = w
+			break
+		}
+	}
+
+	if bestP != nil && (bestW == nil || bestP.ord < bestW.ord) {
+		// Copy slots only for the winner: loser branches leave no keys,
+		// mirroring the tree's short-circuit.
+		if params != nil {
+			for i, si := range bestP.pdepths {
+				s, e := slots[si][0], slots[si][1]
+				params[bestP.names[i]] = path[s:e]
+			}
+		}
+		return bestP.handler, bestP.route
+	}
+	if bestW != nil {
+		if params != nil {
+			// Decision writes nothing until a win, so no loser keys exist.
+			rest := path[len(bestW.prefix):]
+			if len(rest) > 0 && rest[0] == '/' {
+				rest = rest[1:]
+			}
+			params["*"] = rest
+		}
+		return bestW.handler, bestW.route
+	}
+	// Miss: fall back to the tree for an exact answer.
+	if h, rt, ok := r.tree.search(method, path, params); ok {
+		return h, rt
+	}
 	return r.notFoundOrNotAllowed(path)
 }
 
@@ -205,6 +301,7 @@ func (r *SingleThreadedRouter) AddFastRoute(method, path string, fastHandler fas
 		FastHandler: fastHandler,
 	}
 	r.tree.insert(method, path, nil, route)
+	r.markDirty()
 	return route
 }
 
@@ -215,6 +312,7 @@ func (r *SingleThreadedRouter) Reset() {
 	r.staticDELETE = make(map[string]*FastRoute, 2)
 	r.staticOther = make(map[string]*FastRoute, 2)
 	r.tree = newRadixTree()
+	r.markDirty()
 }
 
 func (r *SingleThreadedRouter) GetRouteCount() (static int) {

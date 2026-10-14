@@ -114,6 +114,9 @@ func (a *App) Route(path string) *router.Route {
 }
 
 func (a *App) newServer() *fasthttp.Server {
+	// Freeze routing into the compiled-switch table before serving.
+	// Later Add calls mark it dirty and it rebuilds lazily.
+	a.singleRouter.SetCompiled(true)
 	srv := &fasthttp.Server{
 		Handler:                       a.Handler(),
 		Logger:                        log.New(io.Discard, "", 0),

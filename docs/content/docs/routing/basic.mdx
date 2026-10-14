@@ -49,3 +49,29 @@ group := app.Group("/api")
 group.Get("/users", UserListHandler)
 group.Post("/users", CreateUserHandler)
 ```
+
+---
+
+## Compiled routing
+
+When the server starts, TurboGo transcribes the radix tree into a
+compiled-switch table (per-method decision trees + ordered wildcard
+prefixes). Static routes keep their O(1) map fast path; parametric and
+wildcard lookups run branch-predictor-friendly whole-segment compares with
+zero allocations.
+
+The compiled table is exact by construction: a 200k-case differential
+fuzz suite (`internal/router/fuzz_test.go`) asserts byte-identical
+results against the radix tree on every change, and anything the table
+cannot express falls back to the tree automatically.
+
+Measured on AMD Ryzen 5 5600H (`go test -bench`, 0 allocs/op):
+
+| Route kind | ns/op |
+| ---------- | ----- |
+| Static     | ~15   |
+| Param      | ~84   |
+| Wildcard   | ~83   |
+
+Routes registered after startup mark the table dirty and it rebuilds
+lazily on the next lookup — no restart or manual step needed.

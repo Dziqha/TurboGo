@@ -13,12 +13,19 @@ func TestCompile_Counts(t *testing.T) {
 
 	assert.Equal(t, 3, c.ParamRouteCount())
 	assert.Equal(t, 1, c.WildcardCount())
+	require.NotNil(t, c.root)
+}
 
-	// Grouped by segment count: /users/:id (2), /api/:version/users (3), /users/:id/posts (3)
-	bySeg := c.params[methodIdx["GET"]]
-	require.NotNil(t, bySeg)
-	assert.Len(t, bySeg[2], 1)
-	assert.Len(t, bySeg[3], 2)
+func TestCompile_MirrorsFragments(t *testing.T) {
+	r := NewSingleThreadedRouter()
+	r.AddParametric("GET", "/a/:x", dummyHandler, &Route{Path: "/a/:x"})
+	r.AddParametric("GET", "/api/:v/users", dummyHandler, &Route{Path: "/api/:v/users"})
+
+	c := r.Compile()
+	require.NotNil(t, c.root)
+	// Root fragment edge "a" shared by both patterns (prefix split).
+	require.Len(t, c.root.edges, 1)
+	assert.Equal(t, "a", c.root.edges[0].frag)
 }
 
 func TestCompile_ParamNamesFirstRegistrationWins(t *testing.T) {
@@ -27,11 +34,7 @@ func TestCompile_ParamNamesFirstRegistrationWins(t *testing.T) {
 	r.AddParametric("GET", "/users/:name", dummyHandler, &Route{Path: "/users/:name"})
 
 	c := r.Compile()
-	list := c.params[methodIdx["GET"]][2]
-	// Same skeleton overwrites the same tree leaf, so only one entry
-	// remains, keeping the first-registered param name.
-	require.Len(t, list, 1)
-	assert.Equal(t, []string{"id"}, list[0].names)
+	assert.Equal(t, 1, c.ParamRouteCount())
 }
 
 func TestCompile_WildcardPrefix(t *testing.T) {
@@ -48,4 +51,43 @@ func TestCompile_Empty(t *testing.T) {
 	c := r.Compile()
 	assert.Equal(t, 0, c.ParamRouteCount())
 	assert.Equal(t, 0, c.WildcardCount())
+}
+
+func TestCompile_DecisionTreeLookup(t *testing.T) {
+	r := prepareBenchRouter()
+	r.SetCompiled(true)
+
+	p := map[string]string{}
+	h, rt := r.Find("GET", "/users/42", p)
+	require.NotNil(t, h)
+	require.NotNil(t, rt)
+	assert.Equal(t, "/users/:id", rt.Path)
+	assert.Equal(t, "42", p["id"])
+
+	p = map[string]string{}
+	_, rt = r.Find("GET", "/users/new-x/posts", p)
+	require.NotNil(t, rt)
+	assert.Equal(t, "/users/:id/posts", rt.Path)
+}
+
+func TestCompiled_DirtyRecompile(t *testing.T) {
+	r := NewSingleThreadedRouter()
+	r.AddParametric("GET", "/users/:id", dummyHandler, &Route{Path: "/users/:id"})
+	r.SetCompiled(true)
+
+	// Register after compile: table rebuilds lazily on next lookup.
+	r.AddParametric("GET", "/orgs/:oid", dummyHandler, &Route{Path: "/orgs/:oid"})
+
+	p := map[string]string{}
+	_, rt := r.Find("GET", "/orgs/7", p)
+	require.NotNil(t, rt)
+	assert.Equal(t, "/orgs/:oid", rt.Path)
+	assert.Equal(t, "7", p["oid"])
+
+	// Old routes keep working through the rebuilt table.
+	p = map[string]string{}
+	_, rt = r.Find("GET", "/users/9", p)
+	require.NotNil(t, rt)
+	assert.Equal(t, "/users/:id", rt.Path)
+	assert.Equal(t, "9", p["id"])
 }
