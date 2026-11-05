@@ -26,7 +26,7 @@ jobs:
           go test ./internal/router -bench=. -benchtime=100000x -benchmem -run='^$' | tee router-bench.txt
           go version >> router-bench.txt
           uname -a >> router-bench.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: router-bench
           path: router-bench.txt
@@ -73,7 +73,7 @@ jobs:
           go version >> ci-bench.txt
           uname -a >> ci-bench.txt
           kill %1 || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ci-bench
           path: ci-bench.txt
