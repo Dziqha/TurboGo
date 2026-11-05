@@ -10,6 +10,7 @@ can judge it and rerun it yourself.
 
 - **Host:** AMD Ryzen 5 5600H (6C/12T), CachyOS, governor `performance`
 - **Toolchain:** Go 1.26.5, fasthttp v1.77.0
+- **Comparison servers:** Fiber v2 2.52.16, Fiber v3 3.6.1, Echo v5 5.4.4
 - **Load generator:** `wrk` on the same host, so client and server share cores
 - **Server settings:** `GOMAXPROCS=12`, release build, logging disabled
 
@@ -34,35 +35,34 @@ below is reproducible from this repository.
 
 | Framework | RPS (median) | min-max | p99 |
 |-----------|--------------|---------|-----|
-| fasthttp  | 454,946 | 451,597-456,222 | 4.98 ms |
-| **turbogo** | **440,657** | 386,537-452,579 | 5.14 ms |
-| fiber v3  | 428,714 | 406,174-444,409 | 5.38 ms |
-| fiber v2  | 415,312 | 411,929-443,368 | 5.51 ms |
-| net/http  | 287,070 | 269,255-288,166 | 10.18 ms |
-| chi       | 268,028 | 266,142-268,081 | 12.08 ms |
-| echo      | 267,032 | 235,743-267,744 | 12.16 ms |
-| gin       | 252,597 | 239,944-263,501 | 14.77 ms |
+| fasthttp  | 462,022 | 455,666-464,543 | 4.97 ms |
+| fiber v2  | 453,277 | 445,724-456,400 | 5.08 ms |
+| **turbogo** | **450,054** | 433,408-458,268 | 5.07 ms |
+| fiber v3  | 441,530 | 440,756-450,752 | 5.25 ms |
+| net/http  | 296,132 | 292,545-296,678 | 9.46 ms |
+| chi       | 275,713 | 271,759-277,012 | 11.39 ms |
+| gin       | 275,065 | 258,416-277,736 | 11.69 ms |
+| echo      | 270,836 | 259,125-274,009 | 11.26 ms |
 
-TurboGo is 3% behind fasthttp and 3% ahead of Fiber v3 on the median, but its
-own spread is 15%: one of the three reps landed at 386k. Treat the fasthttp,
-TurboGo, Fiber v3 and Fiber v2 rows as one group. Every fasthttp-based server
-is ~1.6x the net/http-based group.
+TurboGo is 2.6% behind fasthttp and inside 2% of both Fiber versions: the
+fasthttp-based group is interchangeable at this concurrency. Every
+fasthttp-based server is ~1.6x the net/http-based group.
 
 ### c = 200, t = 6 (thread-matched)
 
 | Framework | RPS (median) | min-max | p99 |
 |-----------|--------------|---------|-----|
-| fasthttp    | 456,583 | 450,582-481,086 | 2.16 ms |
-| fiber v3    | 447,161 | 446,463-447,542 | 2.25 ms |
-| fiber v2    | 445,616 | 444,756-448,179 | 2.20 ms |
-| **turbogo** | **443,907** | 441,111-444,742 | 2.21 ms |
-| net/http    | 288,596 | 287,648-301,222 | 3.40 ms |
-| chi         | 264,726 | 244,356-265,967 | 3.60 ms |
-| gin         | 263,915 | 261,501-265,697 | 3.63 ms |
-| echo        | 254,873 | 252,851-255,900 | 3.83 ms |
+| fasthttp    | 453,821 | 444,840-459,026 | 2.20 ms |
+| fiber v2    | 446,904 | 440,859-450,891 | 2.16 ms |
+| **turbogo** | **442,483** | 439,822-442,856 | 2.20 ms |
+| fiber v3    | 439,446 | 431,254-443,011 | 2.24 ms |
+| net/http    | 285,608 | 285,363-285,989 | 3.52 ms |
+| gin         | 264,289 | 262,677-265,495 | 3.72 ms |
+| chi         | 263,415 | 261,926-266,778 | 3.68 ms |
+| echo        | 256,752 | 256,026-257,498 | 3.66 ms |
 
-Within 3% of fasthttp, and within 1% of Fiber v2/v3, with a sub-1% spread.
-This is the configuration to trust for framework comparisons: parity with the
+Within 2.5% of fasthttp and 1% of Fiber, with sub-1% spread on TurboGo. This
+is the configuration to trust for framework comparisons: parity with the
 other fasthttp-based servers, which is the expected result for a thin layer
 on the same engine.
 
@@ -115,19 +115,19 @@ Median of 3 runs, 300,000 iterations each:
 
 | Case | ns/request |
 |------|------------|
-| bare fasthttp (path + switch) | 177 |
-| **TurboGo, param route** | **179** |
-| TurboGo, static route | 148 |
+| bare fasthttp (path + switch) | 173 |
+| **TurboGo, param route** | **180** |
+| TurboGo, static route | 144 |
 | Fiber v2 | 287 |
-| Fiber v3 | 312 |
-| TurboGo, JSON response | 640 |
+| Fiber v3 | 305 |
+| TurboGo, JSON response | 605 |
 
-The bare baseline (65 ns) never touches the path, so it does not pay for URI
-parsing; the comparison that matters is the param row, where both sides must
-read the path. TurboGo is within 2% of a hand-written path-plus-switch
-handler, meaning the router, context pool, middleware chain and recovery
-together are effectively free, and roughly 40% thinner than Fiber on the same
-engine.
+The bare static baseline (63 ns) never touches the path, so it does not pay
+for URI parsing; the comparison that matters is the param row, where both
+sides must read the path. TurboGo is within 4% of a hand-written
+path-plus-switch handler, meaning the router, context pool, middleware chain
+and recovery together are effectively free, and ~37% thinner than Fiber on
+the same engine.
 
 ## Reproduce
 

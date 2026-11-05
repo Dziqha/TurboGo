@@ -13,11 +13,11 @@ adding zero-allocation routing and a set of built-in engines.
 It does **not** claim to be the fastest framework in every benchmark. The
 honest summary is:
 
-- throughput at fasthttp parity: within 3% of fasthttp and of Fiber v2/v3 in
-  the thread-matched run, and in the same ±15% band at oversubscribed
-  concurrency;
-- the thinnest framework layer we measured: in-process, TurboGo is within 2%
-  of a bare path-plus-switch handler and ~40% cheaper than Fiber;
+- throughput at fasthttp parity: within 3% of fasthttp and within 2% of
+  Fiber v2/v3 in the thread-matched run, and in the same band at
+  oversubscribed concurrency;
+- the thinnest framework layer we measured: in-process, TurboGo is within 4%
+  of a bare path-plus-switch handler and ~37% cheaper than Fiber;
 - features that other frameworks expect you to assemble from plugins.
 
 ## Architecture
@@ -40,14 +40,14 @@ page):
 
 | Framework | c=200, t=6 | c=512, t=12 |
 |---|---|---|
-| fasthttp | 456,583 | 454,946 |
-| **TurboGo** | **443,907** | **440,657** |
-| Fiber v2 | 445,616 | 415,312 |
-| Fiber v3 | 447,161 | 428,714 |
-| net/http | 288,596 | 287,070 |
-| Chi | 264,726 | 268,028 |
-| Gin | 263,915 | 252,597 |
-| Echo | 254,873 | 267,032 |
+| fasthttp | 453,821 | 462,022 |
+| **TurboGo** | **442,483** | **450,054** |
+| Fiber v2 | 446,904 | 453,277 |
+| Fiber v3 | 439,446 | 441,530 |
+| net/http | 285,608 | 296,132 |
+| Chi | 263,415 | 275,713 |
+| Gin | 264,289 | 275,065 |
+| Echo | 256,752 | 270,836 |
 
 Two things are structural and repeat across runs:
 
@@ -64,14 +64,15 @@ In-process (no sockets, no syscalls), invoking each framework as a
 
 | Case | ns/request |
 |---|---|
-| bare fasthttp, path + switch | 177 |
-| **TurboGo, param route** | **179** |
+| bare fasthttp, path + switch | 173 |
+| **TurboGo, param route** | **180** |
 | Fiber v2 | 287 |
-| Fiber v3 | 312 |
+| Fiber v3 | 305 |
 
 TurboGo's router, context pool, middleware chain and recovery together cost
-about 2 ns more than the hand-written baseline, i.e. nothing measurable. That
-is the property we optimize for: the framework should be invisible.
+about 7 ns more than the hand-written baseline, i.e. nothing measurable at
+network scale. That is the property we optimize for: the framework should be
+invisible.
 
 ## When to choose what
 
