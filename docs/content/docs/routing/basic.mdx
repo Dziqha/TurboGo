@@ -95,5 +95,5 @@ is byte-identical either way: a 50k-target differential test asserts the
 fast path always matches the parser.
 
 Measured on the same machine (`go test -bench`, 0 allocs/op):
-`ctx.Path()` 92ns vs the guarded fast path 14ns — roughly 78ns less CPU
+`ctx.Path()` 105ns vs the guarded fast path 14ns — roughly 91ns less CPU
 per request, with no change in matching behavior.

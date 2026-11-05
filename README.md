@@ -100,19 +100,20 @@ go run example.go
 ## 🧪 Benchmark Overview
 
 Measured on a 6C/12T Ryzen 5 5600H with Go 1.26, `wrk` on the same host,
-round-robin reps, median of 5. Method, spread and caveats:
+round-robin reps, median of 3. Method, spread and caveats:
 [Benchmarks docs](docs/content/docs/benchmarks.mdx).
 
 | Workload | TurboGo | fasthttp | Fiber v3 | Gin | Echo |
 |---|---|---|---|---|---|
-| `GET /user/42`, c=200, t=6 | 386,102 | 393,594 | 378,991 | — | — |
-| `GET /user/42`, c=512, t=12 | 389,963 | 426,374 | 414,118 | 259,817 | 249,975 |
-| In-process, per request | **155 ns** | 166 ns (bare path+switch) | 308 ns | — | — |
+| `GET /user/42`, c=200, t=6 | 443,907 | 456,583 | 447,161 | 263,915 | 254,873 |
+| `GET /user/42`, c=512, t=12 | 440,657 | 454,946 | 428,714 | 252,597 | 267,032 |
+| In-process, per request | 179 ns | 177 ns (bare path+switch) | 312 ns | — | — |
 
-TurboGo is a thin layer over fasthttp: at thread-matched concurrency it is
-within noise of fasthttp and Fiber; at oversubscribed concurrency every
-fasthttp-based server lands inside the ±15% spread. What the framework adds is
-zero-allocation routing and built-in engines, not a different HTTP engine.
+TurboGo is a thin layer over fasthttp: within 3% of the engine and of Fiber
+in the thread-matched run, and inside the ±15% band at oversubscribed
+concurrency. In-process it costs ~2 ns more than a bare path-plus-switch
+handler. What the framework adds is zero-allocation routing and built-in
+engines, not a different HTTP engine.
 
 ---
 

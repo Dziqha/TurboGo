@@ -13,10 +13,11 @@ adding zero-allocation routing and a set of built-in engines.
 It does **not** claim to be the fastest framework in every benchmark. The
 honest summary is:
 
-- throughput at fasthttp parity, ahead of Fiber v2/v3 in some shapes and
-  slightly behind in others, and well ahead of net/http-based frameworks;
-- the thinnest framework layer we measured (in-process, TurboGo adds less
-  than a bare path-plus-switch handler);
+- throughput at fasthttp parity: within 3% of fasthttp and of Fiber v2/v3 in
+  the thread-matched run, and in the same ±15% band at oversubscribed
+  concurrency;
+- the thinnest framework layer we measured: in-process, TurboGo is within 2%
+  of a bare path-plus-switch handler and ~40% cheaper than Fiber;
 - features that other frameworks expect you to assemble from plugins.
 
 ## Architecture
@@ -34,43 +35,43 @@ honest summary is:
 ## Measured throughput
 
 `GET /user/42`, 6C/12T laptop, `wrk` on the same host, round-robin reps,
-median of 5 (full method and spread on the [benchmarks](/docs/benchmarks)
+median of 3 (full method and spread on the [benchmarks](/docs/benchmarks)
 page):
 
 | Framework | c=200, t=6 | c=512, t=12 |
 |---|---|---|
-| fasthttp | 393,594 | 426,374 |
-| **TurboGo** | **386,102** | **389,963** |
-| Fiber v2 | 385,100 | 391,072 |
-| Fiber v3 | 378,991 | 414,118 |
-| net/http | — | 273,207 |
-| Gin | — | 259,817 |
-| Chi | — | 253,920 |
-| Echo | — | 249,975 |
+| fasthttp | 456,583 | 454,946 |
+| **TurboGo** | **443,907** | **440,657** |
+| Fiber v2 | 445,616 | 415,312 |
+| Fiber v3 | 447,161 | 428,714 |
+| net/http | 288,596 | 287,070 |
+| Chi | 264,726 | 268,028 |
+| Gin | 263,915 | 252,597 |
+| Echo | 254,873 | 267,032 |
 
 Two things are structural and repeat across runs:
 
-1. Everything built on fasthttp is roughly **1.5× faster** than net/http,
+1. Everything built on fasthttp is roughly **1.6x faster** than net/http,
    Gin, Chi and Echo under load.
-2. TurboGo and Fiber sit within noise of each other at thread-matched
-   concurrency. At oversubscribed concurrency the spread (±15%) is larger
-   than the differences, so we do not claim a win there.
+2. TurboGo and Fiber sit within a few percent of each other. At
+   oversubscribed concurrency the spread reaches ±15%, which is larger than
+   the difference between them, so we do not claim a win there.
 
 ## Measured overhead
 
 In-process (no sockets, no syscalls), invoking each framework as a
-`fasthttp.RequestHandler` with a reused context:
+`fasthttp.RequestHandler` with a reused context, median of 3 runs:
 
 | Case | ns/request |
 |---|---|
-| bare fasthttp, path + switch | 166 |
-| **TurboGo, param route** | **155** |
-| Fiber v2 | 267 |
-| Fiber v3 | 308 |
+| bare fasthttp, path + switch | 177 |
+| **TurboGo, param route** | **179** |
+| Fiber v2 | 287 |
+| Fiber v3 | 312 |
 
 TurboGo's router, context pool, middleware chain and recovery together cost
-less than the hand-written baseline. That is the property we optimize for:
-the framework should be invisible.
+about 2 ns more than the hand-written baseline, i.e. nothing measurable. That
+is the property we optimize for: the framework should be invisible.
 
 ## When to choose what
 

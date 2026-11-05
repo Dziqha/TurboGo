@@ -235,3 +235,64 @@ syscall-bound.
   biaya router (29ns/req tidak terukur di wrk c>=200). Optimasi router
   berikutnya harus dinilai lewat microbenchmark, bukan RPS.
 
+
+## Addendum v1.1.1 (Go 1.26.5, fasthttp v1.77.0)
+
+Angka di atas diukur pada v1.1.0 (fasthttp 1.62). Setelah bump engine,
+pengukuran diulang pada 2026-11-05 di mesin dan `wrk` yang sama.
+Metode: round-robin (`fairparams_rr.sh`), median 3 rep, 10s/rep.
+
+### `GET /user/42` — c=512, t=12
+
+| Server | median | min | max | p99 ms | spread |
+|---|---|---|---|---|---|
+| fasthttp | 454,946 | 451,597 | 456,222 | 4.98 | 1.0% |
+| turbogo | 440,657 | 386,537 | 452,579 | 5.14 | 15.0% |
+| fiber3 | 428,714 | 406,174 | 444,409 | 5.38 | 8.9% |
+| fiber2 | 415,312 | 411,929 | 443,368 | 5.51 | 7.6% |
+| stdlib | 287,070 | 269,255 | 288,166 | 10.18 | 6.6% |
+| chi | 268,028 | 266,142 | 268,081 | 12.08 | 0.7% |
+| echo | 267,032 | 235,743 | 267,744 | 12.16 | 12.0% |
+| gin | 252,597 | 239,944 | 263,501 | 14.77 | 9.3% |
+
+### `GET /user/42` — c=200, t=6
+
+| Server | median | min | max | p99 ms | spread |
+|---|---|---|---|---|---|
+| fasthttp | 456,583 | 450,582 | 481,086 | 2.16 | 6.7% |
+| fiber3 | 447,161 | 446,463 | 447,542 | 2.25 | 0.2% |
+| fiber2 | 445,616 | 444,756 | 448,179 | 2.20 | 0.8% |
+| turbogo | 443,907 | 441,111 | 444,742 | 2.21 | 0.8% |
+| stdlib | 288,596 | 287,648 | 301,222 | 3.40 | 4.7% |
+| chi | 264,726 | 244,356 | 265,967 | 3.60 | 8.2% |
+| gin | 263,915 | 261,501 | 265,697 | 3.63 | 1.6% |
+| echo | 254,873 | 252,851 | 255,900 | 3.83 | 1.2% |
+
+### In-process (median 3 x 300k)
+
+| Kasus | ns/req |
+|---|---|
+| bare fasthttp param | 177 |
+| turbogo param | 179 |
+| turbogo static | 148 |
+| turbogo param+json | 640 |
+| fiber2 | 287 |
+| fiber3 | 312 |
+
+### Router microbench (`-benchtime=200000x`)
+
+| Benchmark | ns/op | allocs |
+|---|---|---|
+| Router_Static | 11 | 0 |
+| FindInto_ScaleParam | 45 | 0 |
+| Router_ScaleParam | 72 | 0 |
+| Router_CompiledWildcard | 73 | 0 |
+| Router_Wildcard | 76 | 0 |
+
+### Path parsing
+
+`ctx.Path()` 105 ns vs guarded fast path 14 ns (1M iterasi, 0 allocs).
+
+Catatan: angka plaintext/JSON tidak diukur ulang. Keduanya mengukur engine
+dan encoder, bukan router; selisih antar server fasthttp berada di dalam
+noise, jadi tabel terpisahnya dihapus dari halaman benchmarks.
