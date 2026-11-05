@@ -296,3 +296,52 @@ Metode: round-robin (`fairparams_rr.sh`), median 3 rep, 10s/rep.
 Catatan: angka plaintext/JSON tidak diukur ulang. Keduanya mengukur engine
 dan encoder, bukan router; selisih antar server fasthttp berada di dalam
 noise, jadi tabel terpisahnya dihapus dari halaman benchmarks.
+
+## Addendum — harness versi baru (Fiber v3 3.6.1, Fiber v2 2.52.16, Echo v5 5.4.4)
+
+Bench module di-update ke rilis terbaru (commit `d71c275`). Library tidak
+berubah; semua server pembanding dibangun ulang lalu sweep diulang dengan
+metode sama (round-robin, median 3, 10s).
+
+### c=512, t=12
+
+| Server | median | min | max | p99 ms | spread |
+|---|---|---|---|---|---|
+| fasthttp | 462,022 | 455,666 | 464,543 | 4.97 | 1.9% |
+| fiber2 | 453,277 | 445,724 | 456,400 | 5.08 | 2.4% |
+| turbogo | 450,054 | 433,408 | 458,268 | 5.07 | 5.5% |
+| fiber3 | 441,530 | 440,756 | 450,752 | 5.25 | 2.3% |
+| stdlib | 296,132 | 292,545 | 296,678 | 9.46 | 1.4% |
+| chi | 275,713 | 271,759 | 277,012 | 11.39 | 1.9% |
+| gin | 275,065 | 258,416 | 277,736 | 11.69 | 7.0% |
+| echo | 270,836 | 259,125 | 274,009 | 11.26 | 5.5% |
+
+### c=200, t=6
+
+| Server | median | min | max | p99 ms | spread |
+|---|---|---|---|---|---|
+| fasthttp | 453,821 | 444,840 | 459,026 | 2.20 | 3.1% |
+| fiber2 | 446,904 | 440,859 | 450,891 | 2.16 | 2.2% |
+| turbogo | 442,483 | 439,822 | 442,856 | 2.20 | 0.7% |
+| fiber3 | 439,446 | 431,254 | 443,011 | 2.24 | 2.7% |
+| stdlib | 285,608 | 285,363 | 285,989 | 3.52 | 0.2% |
+| gin | 264,289 | 262,677 | 265,495 | 3.72 | 1.1% |
+| chi | 263,415 | 261,926 | 266,778 | 3.68 | 1.8% |
+| echo | 256,752 | 256,026 | 257,498 | 3.66 | 0.6% |
+
+### In-process (median 3 x 300k)
+
+| Kasus | ns/req |
+|---|---|
+| bare fasthttp param | 173 |
+| turbogo param | 180 |
+| bare fasthttp static | 63 |
+| turbogo static | 144 |
+| turbogo fast | 143 |
+| turbogo param+json | 605 |
+| fiber2 | 287 |
+| fiber3 | 305 |
+
+Fiber v3 3.6.1 ~2% lebih cepat dari beta.4 di in-process (305 vs 312 ns)
+dan ~3% lebih lambat dari turbogo di wrk; peringkat fasthttp-family tidak
+berubah, semuanya di dalam band noise.

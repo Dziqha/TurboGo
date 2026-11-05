@@ -105,13 +105,13 @@ round-robin reps, median of 3. Method, spread and caveats:
 
 | Workload | TurboGo | fasthttp | Fiber v3 | Gin | Echo |
 |---|---|---|---|---|---|
-| `GET /user/42`, c=200, t=6 | 443,907 | 456,583 | 447,161 | 263,915 | 254,873 |
-| `GET /user/42`, c=512, t=12 | 440,657 | 454,946 | 428,714 | 252,597 | 267,032 |
-| In-process, per request | 179 ns | 177 ns (bare path+switch) | 312 ns | — | — |
+| `GET /user/42`, c=200, t=6 | 442,483 | 453,821 | 439,446 | 264,289 | 256,752 |
+| `GET /user/42`, c=512, t=12 | 450,054 | 462,022 | 441,530 | 275,065 | 270,836 |
+| In-process, per request | 180 ns | 173 ns (bare path+switch) | 305 ns | — | — |
 
-TurboGo is a thin layer over fasthttp: within 3% of the engine and of Fiber
-in the thread-matched run, and inside the ±15% band at oversubscribed
-concurrency. In-process it costs ~2 ns more than a bare path-plus-switch
+TurboGo is a thin layer over fasthttp: within 3% of the engine and 1-2% of
+Fiber in the thread-matched run, and inside the noise band at oversubscribed
+concurrency. In-process it costs ~7 ns more than a bare path-plus-switch
 handler. What the framework adds is zero-allocation routing and built-in
 engines, not a different HTTP engine.
 
