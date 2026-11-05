@@ -14,3 +14,8 @@ bench/results/*.log
 cpu.prof
 mem.prof
 coverage.out
+
+# bench: tracked SQL fixtures and local-only artifacts
+!bench/**/*.sql
+bench/results/*.json
+bench/profiler/

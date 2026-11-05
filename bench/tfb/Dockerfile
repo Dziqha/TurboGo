@@ -1,18 +1,19 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk --no-cache add git
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
-RUN go mod download
+COPY bench/go.mod bench/go.sum ./bench/
+RUN cd bench && go mod download
 
 COPY *.go ./
-COPY turbo-bench/ ./turbo-bench/
 COPY core/ ./core/
 COPY internal/ ./internal/
 COPY middleware/ ./middleware/
-RUN CGO_ENABLED=0 go build -o /server -ldflags="-s -w" ./turbo-bench/
+COPY bench/turbogo/ ./bench/turbogo/
+RUN cd bench && CGO_ENABLED=0 go build -o /server -ldflags="-s -w" ./turbogo
 
 FROM alpine:3.21
 

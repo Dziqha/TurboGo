@@ -8,7 +8,8 @@ on:
       - 'app.go'
       - 'core/**'
       - 'internal/router/**'
-      - 'turbo-bench/**'
+      - 'bench/turbogo/**'
+      - 'bench/tfb/**'
       - 'bench/**'
       - '.github/workflows/bench.yml'
 
@@ -49,20 +50,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
       - name: Install wrk
         run: sudo apt-get update -qq && sudo apt-get install -y -qq wrk
       - name: Seed DB
-        run: psql "host=localhost user=postgres password=postgres dbname=hello_world sslmode=disable" -f turbo-bench/seed.sql
+        run: psql "host=localhost user=postgres password=postgres dbname=hello_world sslmode=disable" -f bench/turbogo/seed.sql
         env:
           PGPASSWORD: postgres
       - name: Build turbogo + fiber comparator
+        working-directory: bench
         run: |
-          go build -o /tmp/opencode/turbogo ./turbo-bench/
-          go build -o /tmp/opencode/fiber ./deploy/tfb/fiber-main.go || echo "fiber comparator optional"
+          go build -o "$RUNNER_TEMP/turbogo" ./turbogo
+          go build -o "$RUNNER_TEMP/fiber" ./tfb/fiber-main.go || echo "fiber comparator optional"
       - name: Quick wrk (5s, c64, no full matrix)
         run: |
-          DATABASE_URL="host=localhost user=postgres password=postgres dbname=hello_world sslmode=disable" PORT=8080 /tmp/opencode/turbogo >/tmp/opencode/turbogo.log 2>&1 &
+          DATABASE_URL="host=localhost user=postgres password=postgres dbname=hello_world sslmode=disable" PORT=8080 "$RUNNER_TEMP/turbogo" >"$RUNNER_TEMP/turbogo.log" 2>&1 &
           for i in $(seq 1 50); do curl -sf http://127.0.0.1:8080/plaintext >/dev/null 2>&1 && break; sleep 0.2; done
           for ep in plaintext json user/42 db "queries?queries=20" fortunes "update?queries=20"; do
             echo "== /$ep =="
@@ -82,6 +84,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate TFB files
         run: |
-          python3 -c "import json; json.load(open('deploy/tfb/benchmark_config.json')); print('benchmark_config.json OK')"
-          docker build -f deploy/tfb/Dockerfile -t turbogo-tfb-check .
+          python3 -c "import json; json.load(open('bench/tfb/benchmark_config.json')); print('benchmark_config.json OK')"
+          docker build -f bench/tfb/Dockerfile -t turbogo-tfb-check .
           echo "Dockerfile builds OK"
