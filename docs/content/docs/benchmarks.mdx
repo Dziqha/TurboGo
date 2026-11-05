@@ -1,96 +1,143 @@
 ---
 title: Benchmarks
-description: Benchmark results and built-in features of TurboGo
+description: Reproducible throughput, latency and overhead measurements
 ---
 
-import { ResponsiveImage } from '@/components/responsive-image';
+# Benchmarks
 
+Every number on this page comes with its machine, method and spread, so you
+can judge it and rerun it yourself.
 
-**TurboGo** is a high-performance, modular Go web framework built for speed, simplicity, and extensibility.
+- **Host:** AMD Ryzen 5 5600H (6C/12T), CachyOS, governor `performance`
+- **Toolchain:** Go 1.26.5
+- **Load generator:** `wrk` on the same host, so client and server share cores
+- **Server settings:** `GOMAXPROCS=12`, release build, logging disabled
 
----
-> ⚠️ Benchmarked on Windows amd64, Ryzen 5 5600H, Go 1.24. The test was run 3 times consecutively, and the result displayed corresponds to the final iteration.
+Because the load generator runs on the same machine, absolute throughput is
+lower than a two-host setup. Relative comparisons remain useful; everything
+below is reproducible from this repository.
 
-## Average Latency
+## How the sweeps were run
 
-<ResponsiveImage
-  lightSrc="/images/latencySection_light.png"
-  darkSrc="/images/latencySection.png"
-  alt="Requests per second chart"
-  className="w-full h-auto"
-/>
+- **Round-robin** (`bench/fairparams_rr.sh`): each rep runs every framework in
+  sequence, so thermal drift affects all of them equally. Median of 5 reps,
+  reported with min-max. Previous block-per-server measurements were biased
+  by drift and are not used here.
+- **Same-host caveat:** `wrk -t12` plus a 12-thread server oversubscribes a
+  6-core CPU. Spread of ±15% is normal in that configuration; differences
+  smaller than the spread are noise, not wins.
+- **In-process** measurements (no sockets, no syscalls) are deterministic and
+  are the right way to compare framework overhead.
 
+## Dynamic route: `GET /user/42`
 
-| Framework   | Latency|
-|-------------|-------------|
-| TurboGo 🌀   | **167μs** |
-| Echo        | 230μs    |
-| Gin         | 225μs    |
-| Fiber       | 376μs |
+Round-robin, median of 5, 12s per rep.
 
-> ⏱️ TurboGo consistently delivers the lowest response times, making it an excellent choice for building ultra-fast and responsive APIs.
+### c = 512, t = 12 (oversubscribed, spread ±15%)
 
----
+| Framework | RPS (median) | min-max | p99 |
+|-----------|--------------|---------|-----|
+| fasthttp  | 426,374 | 388,321-443,566 | 5.4 ms |
+| fiber v3  | 414,118 | 372,102-445,812 | 5.7 ms |
+| fiber v2  | 391,072 | 368,681-422,960 | 5.9 ms |
+| **turbogo** | **389,963** | 379,425-432,003 | 5.9 ms |
+| net/http  | 273,207 | 244,673-290,676 | 11.0 ms |
+| gin       | 259,817 | 223,766-277,831 | 11.5 ms |
+| chi       | 253,920 | 228,895-272,967 | 15.8 ms |
+| echo      | 249,975 | 235,055-257,737 | 19.5 ms |
 
-## Concurrency Performance
+TurboGo is 8% behind fasthttp and 6% behind Fiber v3 here, while all three
+are inside the ±15% spread of this configuration. Every fasthttp-based server
+is ~1.5× net/http, Gin, Chi and Echo.
 
-<ResponsiveImage
-  lightSrc="/images/concurrency-performance_light.png"
-  darkSrc="/images/concurrency-performance.png"
-  alt="Requests per second chart"
-  className="w-full h-auto"
-/>
+### c = 200, t = 6 (thread-matched, spread ±5%)
 
+| Framework | RPS (median) | min-max | p99 |
+|-----------|--------------|---------|-----|
+| fasthttp    | 393,594 | 380,040-396,887 | 2.36 ms |
+| **turbogo** | **386,102** | 366,259-400,941 | 2.36 ms |
+| fiber v2    | 385,100 | 370,136-392,872 | 2.40 ms |
+| fiber v3    | 378,991 | 376,742-397,962 | 2.47 ms |
 
-| Concurrency | TurboGo 🌀    | Fiber        | Gin       | Echo      |
-| ----------- | ------------- | ------------ | --------- | --------- |
-| 1           | 9,705.70      | **9,751.30** | 8,810.40  | 8,929.20  |
-| 5           | **25,590.30** | 25,037.60    | 22,313.50 | 22,306.80 |
-| 10          | **48,028.70** | 41,602.60    | 38,309.90 | 37,462.70 |
-| 25          | 37,778.70     | 36,641.80    | 34,648.20 | 34,330.50 |
-| 50          | **48,124.70** | 45,156.70    | 43,090.50 | 40,960.80 |
+Within ~2% of fasthttp and Fiber v2: parity, as expected from a layer built
+on the same engine.
 
+## Plaintext and JSON (c = 512)
 
-> ⚙️ TurboGo delivers high and consistent performance across all concurrency levels.
-It leads at 10 and 50 concurrent requests with 48k+ req/sec, proving its scalability.
+Median of 3 with randomized server order, 15s per rep (`bench/fair.sh`).
 
----
+| Workload | fasthttp | turbogo | fiber v2 | fiber v3 | net/http | gin | echo | chi |
+|----------|----------|---------|----------|----------|----------|-----|------|-----|
+| plaintext | 438,100 | **460,504** | 429,700 | 422,091 | 272,926 | 259,026 | 253,701 | 254,900 |
+| json | **427,992** | 414,174 | 405,672 | 408,175 | 270,800 | 257,295 | 253,439 | 252,123 |
 
-##  Requests Per Second (RPS)
+The plaintext advantage (~5%) is at the edge of run-to-run variance and should
+not be read as a categorical win; treat plaintext as parity with fasthttp.
 
-<ResponsiveImage
-  lightSrc="/images/rpsSection_light.png"
-  darkSrc="/images/rpsSection.png"
-  alt="Requests per second chart"
-  className="w-full h-auto"
-/>
+## Route lookup (CPU only, deterministic)
 
-| Framework   | Requests/sec |
-|-------------|--------------|
-| TurboGo 🌀   | **48,124.70** |
-| Echo        | 40,960.80    |
-| Gin         | 43,090.50   |
-| Fiber       | 45,156.70 |
+`go test -bench` on the router, no network. Absolute values shift with CPU
+frequency between sessions, so only before/after pairs measured in the same
+session are meaningful.
 
-> 📊 TurboGo handles high traffic efficiently, maintaining stability and outperforming other frameworks in throughput.
+| Benchmark | Before | After | Change |
+|-----------|--------|-------|--------|
+| 120 parametric routes, lookup | 66 ns/op, 0 allocs | 46 ns/op, 0 allocs | -31% |
+| Wildcard (compiled) | 71 ns/op | 38 ns/op | -46% |
+| Wildcard (radix fallback) | 70 ns/op | 59 ns/op | -16% |
+| Static route | 15-16 ns/op | 15-16 ns/op | unchanged |
 
----
+Route params now land in eight inline slots on the context, so a matched
+request allocates nothing. Correctness is enforced by a differential fuzz
+test that compares the slot API against the original map-based lookup over
+random paths and methods.
 
-##  Built-in Features
+## Free per-request path parsing
 
-TurboGo ships with powerful built-in systems to accelerate backend development:
+fasthttp parses the request URI and normalizes the path on the first
+`ctx.Path()` call, which dominated handler CPU for trivial routes. TurboGo
+uses the raw request target whenever normalization provably cannot change it
+and falls back otherwise:
 
-- ✅ **Routing Engine** – middleware-first with handler chaining
-- ✅ **Custom Context** – fast and lightweight with DI support
-- ✅ **Persistent Queue** – task queue system with memory & file support
-- ✅ **Pub/Sub System** – event-based communication out of the box
-- ✅ **Caching Layer** – in-memory and file-based cache with TTL
-- ✅ **CLI Generator** – project scaffolding via `turbogo new`
-- ✅ **Structured Logger** – no external dependency required
+| | ns/op |
+|---|---|
+| `ctx.Path()` (parse + normalize) | 92 |
+| TurboGo guarded fast path | 14 |
 
----
+A 50,000-target differential test asserts the fast path is byte-identical to
+`ctx.Path()`; queries and fragments are trimmed the same way.
 
-##  Stay Connected
+## Framework overhead per request (in-process, no syscalls)
 
-Follow development or contribute on [GitHub](https://github.com/Dziqha/TurboGo). Be a part of TurboGo’s journey to becoming a next-gen Go backend framework.
+Each framework is invoked as a `fasthttp.RequestHandler` with a reused
+`RequestCtx` (`GET /user/42`), which isolates framework work from the kernel.
 
+| Case | Before | After path fast-path |
+|------|--------|----------------------|
+| bare fasthttp (path + switch) | 166 ns | 166 ns |
+| **turbogo, param route** | 255 ns | **155 ns** |
+| fiber v2 | 267 ns | 267 ns |
+| fiber v3 | 308 ns | 308 ns |
+| turbogo, static route | 203 ns | 113 ns |
+| turbogo, JSON response | 721 ns | 552 ns |
+
+The bare static baseline (42 ns) never touches the path, so it does not pay
+for URI parsing; the comparison that matters is the param row, where both
+sides must read the path. TurboGo is now slightly faster than a bare
+path-plus-switch handler, meaning the framework layer adds no measurable
+overhead of its own.
+
+## Reproduce
+
+```bash
+# deterministic router + handler benchmarks
+go test ./internal/router -bench=. -benchmem -run='^$'
+cd bench && go test ./inproc -bench=. -benchmem -run='^$'
+
+# network sweeps (needs wrk and running servers)
+bash bench/quick.sh
+bash bench/fairparams_rr.sh 5 12s
+```
+
+Raw results, profiling notes and the full report live in
+[`bench/results/report.md`](https://github.com/Dziqha/TurboGo/blob/main/bench/results/report.md).

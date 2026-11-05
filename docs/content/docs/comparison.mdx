@@ -1,47 +1,90 @@
 ---
 title: Comparison
-description: Comparing TurboGo with other Go web frameworks
+description: How TurboGo compares with Gin, Echo, Fiber and net/http
 ---
 
-#  Framework Comparison
+# Framework Comparison
 
-TurboGo is designed to deliver high performance with modern features built-in. Here’s how it compares to other popular Go frameworks like **Gin**, **Fiber**, and **Echo**.
+TurboGo is a thin layer over [fasthttp](https://github.com/valyala/fasthttp).
+That single sentence explains most of its performance profile: it inherits
+fasthttp's throughput and keeps the layer on top as small as possible, while
+adding zero-allocation routing and a set of built-in engines.
 
----
+It does **not** claim to be the fastest framework in every benchmark. The
+honest summary is:
 
-##  Performance Summary
+- throughput at fasthttp parity, ahead of Fiber v2/v3 in some shapes and
+  slightly behind in others, and well ahead of net/http-based frameworks;
+- the thinnest framework layer we measured (in-process, TurboGo adds less
+  than a bare path-plus-switch handler);
+- features that other frameworks expect you to assemble from plugins.
 
-Based on 3 rounds of benchmark tests using 🖥️ all 12 CPU cores, ⚡ Duration: 10s, and Concurrency levels [1, 5, 10, 25, 50]:
+## Architecture
 
-* 🟢 TurboGo consistently achieved the highest throughput (RPS) across all tests
+| | TurboGo | Gin | Echo | Fiber v2/v3 | net/http |
+|---|---|---|---|---|---|
+| HTTP engine | fasthttp | net/http | net/http | fasthttp | net/http |
+| Route dispatch | compiled switch + radix fallback | radix tree | radix tree | radix tree | `ServeMux` |
+| Path params per matched route | 0 allocations (inline slots) | not measured here | not measured here | not measured here | n/a |
+| Response/request context | pooled, zero-copy | pooled | pooled | pooled | per-request |
+| Built-in queue, pub/sub, cache | yes | no | no | no | no |
+| Test without opening a port | `app.Test` | `httptest` | `httptest` | `app.Test` | `httptest` |
+| Middleware, groups, templates, validation | yes | yes | yes | yes | partial |
 
-* 🟢 Achieved lowest average response time, especially at high concurrency
+## Measured throughput
 
-* ✅ Proven to be stable and reliable under high concurrency load
+`GET /user/42`, 6C/12T laptop, `wrk` on the same host, round-robin reps,
+median of 5 (full method and spread on the [benchmarks](/docs/benchmarks)
+page):
 
-* 🥇 TurboGo emerged as the top performer in every round
+| Framework | c=200, t=6 | c=512, t=12 |
+|---|---|---|
+| fasthttp | 393,594 | 426,374 |
+| **TurboGo** | **386,102** | **389,963** |
+| Fiber v2 | 385,100 | 391,072 |
+| Fiber v3 | 378,991 | 414,118 |
+| net/http | — | 273,207 |
+| Gin | — | 259,817 |
+| Chi | — | 253,920 |
+| Echo | — | 249,975 |
 
-> Detailed charts can be found in the [Benchmark section](/docs/benchmarks)
+Two things are structural and repeat across runs:
 
----
+1. Everything built on fasthttp is roughly **1.5× faster** than net/http,
+   Gin, Chi and Echo under load.
+2. TurboGo and Fiber sit within noise of each other at thread-matched
+   concurrency. At oversubscribed concurrency the spread (±15%) is larger
+   than the differences, so we do not claim a win there.
 
-##  Feature Comparison
+## Measured overhead
 
-| Feature                  | TurboGo | Gin | Fiber | Echo |
-| ------------------------ | ------- | --- | ----- | ---- |
-| ⚡ High Performance       | ✅       | ✅   | ✅     | ✅    |
-| 🧠 Custom Context        | ✅       | ❌   | ❌     | ❌    |
-| 🧵 Middleware Chaining   | ✅       | ✅   | ✅     | ✅    |
-| 🗃️ Queue (on-demand)    | ✅       | ❌   | ❌     | ❌    |
-| 📢 Pub/Sub (on-demand)   | ✅       | ❌   | ❌     | ❌    |
-| 💾 Caching (on-demand)   | ✅       | ❌   | ❌     | ❌    |
-| 🧰 CLI Project Generator | ✅       | ⚠️  | ✅     | ❌    |
-| 📦 Modular Structure     | ✅       | ✅   | ✅     | ✅    |
+In-process (no sockets, no syscalls), invoking each framework as a
+`fasthttp.RequestHandler` with a reused context:
 
-> ⚠️ = Partially available / community-based plugin only
+| Case | ns/request |
+|---|---|
+| bare fasthttp, path + switch | 166 |
+| **TurboGo, param route** | **155** |
+| Fiber v2 | 267 |
+| Fiber v3 | 308 |
 
----
+TurboGo's router, context pool, middleware chain and recovery together cost
+less than the hand-written baseline. That is the property we optimize for:
+the framework should be invisible.
 
-If you're looking for a modern, fast, and extensible Go framework — TurboGo might be the right choice for your next project.
+## When to choose what
 
+- **TurboGo** — you want fasthttp-level performance without dropping to raw
+  fasthttp, plus built-in queue, pub/sub and cache engines, zero-allocation
+  params and an in-process test helper.
+- **Fiber** — you want the largest ecosystem and community around a
+  fasthttp-based framework.
+- **Gin / Echo / Chi** — you want the standard `net/http` ecosystem
+  (`http.Handler` interop, `httptest`, third-party middleware) more than raw
+  throughput.
+- **Raw fasthttp** — you want the maximum possible throughput and are happy
+  to write routing and context plumbing yourself.
 
+If you need `net/http` middleware compatibility, none of the fasthttp-based
+frameworks will fit perfectly; that is an engine-level trade-off, not a
+routing one.

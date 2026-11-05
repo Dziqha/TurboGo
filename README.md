@@ -1,9 +1,9 @@
 # TurboGo
 
-[![Go](https://img.shields.io/badge/Go-1.24-blue)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.25-blue)](https://go.dev)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
 [![Go Report Card](https://goreportcard.com/badge/github.com/Dziqha/TurboGo)](https://goreportcard.com/report/github.com/Dziqha/TurboGo)
-[![Coverage](https://img.shields.io/badge/Coverage-ComingSoon-yellow)]()
+[![Coverage](https://img.shields.io/badge/Coverage-51.9%25-yellow)](https://github.com/Dziqha/TurboGo/actions)
 [![Contributions](https://img.shields.io/badge/Contributions-welcome-blueviolet)](https://github.com/Dziqha/TurboGo/discussions)
 [![License](https://img.shields.io/github/license/Dziqha/TurboGo)](./LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/Dziqha/TurboGo)](https://github.com/Dziqha/TurboGo/commits)
@@ -69,7 +69,6 @@ Interactive prompts:
 
 ### Running TurboGo Example
 
-> Gin requires Go version `1.23 or above.`
 
 ```go
 package main
@@ -100,21 +99,21 @@ go run example.go
 
 ## 🧪 Benchmark Overview
 
-| Benchmark                       | Iterations    | Time/op   | Bytes/op | Allocs/op |
-| ------------------------------- | ------------- | --------- | -------- | --------- |
-| `BenchmarkPubSub_1000Messages`  | 4,181,076     | 270.6 ns  | 249 B    | 4         |
-| `BenchmarkTaskQueue_1000Tasks`  | 4,182,391     | 272.4 ns  | 4 B      | 1         |
-| `BenchmarkTaskQueue_WithDelay`  | 1,071         | 1.107 ms  | 252 B    | 4         |
-| `BenchmarkTaskQueue_CPUProfile` | 1,889,114     | 644.6 ns  | 4 B      | 1         |
-| `BenchmarkCPUPrint`             | 1,000,000,000 | 0.4827 ns | 0 B      | 0         |
-| `BenchmarkTaskQueue_Print`      | 1,880,923     | 638.5 ns  | 4 B      | 1         |
-| `BenchmarkTaskQueue_Parallel`   | 27,765,244    | 43.82 ns  | 18 B     | 1         |
-| `BenchmarkTaskQueue_DelayRetry` | 26,241,208    | 45.48 ns  | 19 B     | 1         |
-| `BenchmarkTaskQueue_WorkerPool` | 4,241,274     | 295.7 ns  | 4 B      | 1         |
-| `BenchmarkTaskQueue_RateLimit`  | 2,211         | 529.5 µs  | 3 B      | 1         |
+Measured on a 6C/12T Ryzen 5 5600H with Go 1.26, `wrk` on the same host,
+round-robin reps, median of 5. Method, spread and caveats:
+[Benchmarks docs](docs/content/docs/benchmarks.mdx).
 
+| Workload | TurboGo | fasthttp | Fiber v3 | Gin | Echo |
+|---|---|---|---|---|---|
+| `GET /user/42`, c=200, t=6 | 386,102 | 393,594 | 378,991 | — | — |
+| `GET /user/42`, c=512, t=12 | 389,963 | 426,374 | 414,118 | 259,817 | 249,975 |
+| In-process, per request | **155 ns** | 166 ns (bare path+switch) | 308 ns | — | — |
 
-> Benchmarked on Windows `amd64, Ryzen 5 5600H, Go 1.24.` ⚠️ Results may vary—run on idle system for accuracy.
+TurboGo is a thin layer over fasthttp: at thread-matched concurrency it is
+within noise of fasthttp and Fiber; at oversubscribed concurrency every
+fasthttp-based server lands inside the ±15% spread. What the framework adds is
+zero-allocation routing and built-in engines, not a different HTTP engine.
+
 ---
 
 ## 🤝 Contributing
