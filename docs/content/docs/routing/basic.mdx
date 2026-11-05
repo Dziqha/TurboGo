@@ -70,8 +70,15 @@ Measured on AMD Ryzen 5 5600H (`go test -bench`, 0 allocs/op):
 | Route kind | ns/op |
 | ---------- | ----- |
 | Static     | ~15   |
-| Param      | ~84   |
-| Wildcard   | ~83   |
+| Param      | ~46   |
+| Wildcard   | ~38   |
+
+Params are delivered through inline slots on the pooled request context
+(8 slots, no map on the hot path), which cut param lookup from ~66ns to
+~46ns and wildcard from ~71ns to ~38ns in the same-session A/B. Paths
+that overflow the slots, or routes resolved by the tree fallback, use a
+map instead — results are identical, only the fast case is
+allocation-free.
 
 Routes registered after startup mark the table dirty and it rebuilds
 lazily on the next lookup — no restart or manual step needed.

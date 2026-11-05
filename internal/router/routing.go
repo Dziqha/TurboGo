@@ -9,11 +9,11 @@ import (
 )
 
 type Route struct {
-	Method   string
-	Path     string
-	Name     string
-	Handlers   []core.Handler
-	Options    RouteOptions
+	Method      string
+	Path        string
+	Name        string
+	Handlers    []core.Handler
+	Options     RouteOptions
 	FastHandler fasthttp.RequestHandler
 }
 

@@ -257,3 +257,26 @@ func BenchmarkFindInto_ScaleParam(b *testing.B) {
 		r.FindInto("GET", pp[1], &dst, ovf)
 	}
 }
+
+func BenchmarkFindInto_Wildcard(b *testing.B) {
+	for _, compiled := range []bool{false, true} {
+		name := "tree"
+		if compiled {
+			name = "compiled"
+		}
+		b.Run(name, func(b *testing.B) {
+			r := prepareBenchRouter()
+			r.SetCompiled(compiled)
+			var dst [core.MaxSlots]core.ParamSlot
+			ovf := map[string]string{}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for k := range ovf {
+					delete(ovf, k)
+				}
+				r.FindInto("GET", "/assets/images/logo.png", &dst, ovf)
+			}
+		})
+	}
+}
