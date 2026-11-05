@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -64,6 +65,9 @@ type App struct {
 	templates    *template.Template
 	srv          *fasthttp.Server
 	ErrorHandler func(*core.Context, error)
+
+	handlerOnce sync.Once
+	handler     fasthttp.RequestHandler
 }
 
 type Group struct {
@@ -184,57 +188,63 @@ func (a *App) RunWithGracefulShutdown(addr string) error {
 func (a *App) Handler() fasthttp.RequestHandler {
 	// Freeze routing like newServer does, so mounting Handler() under a
 	// custom fasthttp server gets the compiled table too. Late routes
-	// still mark it dirty and rebuild lazily.
-	a.singleRouter.SetCompiled(true)
-	return func(ctx *fasthttp.RequestCtx) {
-		method := b2s(ctx.Method())
-		path, _ := routePath(ctx)
+	// still mark it dirty and rebuild lazily. The closure is cached so
+	// repeated calls (see Test) do not recompile the table each time.
+	a.handlerOnce.Do(func() {
+		a.singleRouter.SetCompiled(true)
+		a.handler = a.serve
+	})
+	return a.handler
+}
 
-		c := core.NewContext(ctx, a.cache, nil)
-		c.Templates = a.templates
-		defer core.ReleaseContext(c)
+func (a *App) serve(ctx *fasthttp.RequestCtx) {
+	method := b2s(ctx.Method())
+	path, _ := routePath(ctx)
 
-		defer func() {
-			if rec := recover(); rec != nil {
-				if err, ok := rec.(error); ok {
-					a.handleError(c, err)
-				} else {
-					a.handleError(c, fmt.Errorf("%v", rec))
-				}
-			}
-		}()
-		handler, route, nparams := a.singleRouter.FindInto(method, path, c.Pslots(), c.Params())
-		c.SetNparams(nparams)
+	c := core.NewContext(ctx, a.cache, nil)
+	c.Templates = a.templates
+	defer core.ReleaseContext(c)
 
-		if route != nil {
-			if route.FastHandler != nil {
-				core.ReleaseContext(c)
-				route.FastHandler(ctx)
-				return
-			}
-			hs := route.Handlers
-			if a.pubsub != nil || a.queue != nil {
-				if a.pubsub != nil {
-					c.SetPubsub(a.pubsub)
-				}
-				if a.queue != nil {
-					c.SetQueue(a.queue)
-				}
-			}
-			if len(hs) == 1 {
-				hs[0](c)
+	defer func() {
+		if rec := recover(); rec != nil {
+			if err, ok := rec.(error); ok {
+				a.handleError(c, err)
 			} else {
-				c.SetHandlers(hs)
-				c.Next()
+				a.handleError(c, fmt.Errorf("%v", rec))
 			}
+		}
+	}()
+	handler, route, nparams := a.singleRouter.FindInto(method, path, c.Pslots(), c.Params())
+	c.SetNparams(nparams)
+
+	if route != nil {
+		if route.FastHandler != nil {
+			core.ReleaseContext(c)
+			route.FastHandler(ctx)
+			return
+		}
+		hs := route.Handlers
+		if a.pubsub != nil || a.queue != nil {
+			if a.pubsub != nil {
+				c.SetPubsub(a.pubsub)
+			}
+			if a.queue != nil {
+				c.SetQueue(a.queue)
+			}
+		}
+		if len(hs) == 1 {
+			hs[0](c)
 		} else {
-			c.SetHandlers([]core.Handler{handler})
+			c.SetHandlers(hs)
 			c.Next()
 		}
+	} else {
+		c.SetHandlers([]core.Handler{handler})
+		c.Next()
+	}
 
-		if method == "HEAD" {
-			ctx.Response.ResetBody()
-		}
+	if method == "HEAD" {
+		ctx.Response.ResetBody()
 	}
 }
 

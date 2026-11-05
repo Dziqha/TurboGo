@@ -20,6 +20,7 @@
 - Built-in async engines (PubSub, Queue, Cache)
 - Extensible and clean internal architecture
 - Optional middleware: Auth, Logger, Recovery
+- Test helpers: `app.Test(req)` runs requests in-process, no port needed
 - CLI generator: `npx create-turbogo` for instant project scaffolding
 
 ---
