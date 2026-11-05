@@ -188,7 +188,7 @@ func (a *App) Handler() fasthttp.RequestHandler {
 	a.singleRouter.SetCompiled(true)
 	return func(ctx *fasthttp.RequestCtx) {
 		method := b2s(ctx.Method())
-		path := b2s(ctx.Path())
+		path, _ := routePath(ctx)
 
 		c := core.NewContext(ctx, a.cache, nil)
 		c.Templates = a.templates

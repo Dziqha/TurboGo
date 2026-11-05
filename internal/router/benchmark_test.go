@@ -246,14 +246,13 @@ func BenchmarkFindInto_ScaleParam(b *testing.B) {
 	r := prepareScaleRouter()
 	r.SetCompiled(true)
 	var dst [core.MaxSlots]core.ParamSlot
+	// Compiled matches write slots only, so the overflow map is never
+	// touched here; clearing it would just measure map bookkeeping.
 	ovf := map[string]string{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pp := scaleParamPaths[i%len(scaleParamPaths)]
-		for k := range ovf {
-			delete(ovf, k)
-		}
 		r.FindInto("GET", pp[1], &dst, ovf)
 	}
 }

@@ -82,3 +82,18 @@ allocation-free.
 
 Routes registered after startup mark the table dirty and it rebuilds
 lazily on the next lookup — no restart or manual step needed.
+
+## Path parsing
+
+fasthttp parses the request URI and normalizes the path (percent-decoding,
+duplicate slashes, `/./`, `/../`) on the first `ctx.Path()` call, which
+dominates handler CPU for simple routes. TurboGo checks the raw request
+target first and uses it directly when normalization provably cannot
+change it (no `%`, `\`, `//`, `/./`, `/..`, control bytes; query and
+fragment trimmed), falling back to `ctx.Path()` otherwise. Routing input
+is byte-identical either way: a 50k-target differential test asserts the
+fast path always matches the parser.
+
+Measured on the same machine (`go test -bench`, 0 allocs/op):
+`ctx.Path()` 92ns vs the guarded fast path 14ns — roughly 78ns less CPU
+per request, with no change in matching behavior.

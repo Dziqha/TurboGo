@@ -96,28 +96,45 @@ Setiap framework dipanggil sebagai `fasthttp.RequestHandler` dengan
 `RequestCtx` yang dipakai ulang (reset request/response per iterasi,
 `GET /user/42`). Ini mengisolasi lapisan framework dari syscall:
 
-| Kasus | ns/op | Delta vs bare |
-|-------|-------|---------------|
-| bare fasthttp (path + switch) | 166 | — |
-| **turbogo param** | **255** | **+89** |
-| fiber v2 | 267 | +101 |
-| fiber v3 | 308 | +142 |
-| bare fasthttp static (tanpa akses path) | 42 | — |
-| turbogo static | 203 | +161 |
+| Kasus | Sebelum | Sesudah path fast-path | Delta vs bare |
+|-------|---------|------------------------|---------------|
+| bare fasthttp (path + switch) | 166 | 166 | — |
+| **turbogo param** | 255 | **155** | **-11 (lebih cepat)** |
+| fiber v2 | 267 | 267 | +101 |
+| fiber v3 | 308 | 308 | +142 |
+| turbogo static | 203 | **113** | +71 vs bare tanpa path |
+| turbogo fast | 216 | **123** | — |
+| turbogo param-json | 721 | **552** | — |
 
-Catatan penting: baseline statis "bare" tidak pernah memanggil
-`ctx.Path()`, jadi ia **tidak** membayar `URI.parse` + `normalizePath`.
-Profil run in-process: `URI.parse` 55% cumulative, `normalizePath` 32%.
-Artinya delta +161 di baris statis hampir seluruhnya biaya parsing path
-yang wajib dibayar router berbasis path mana pun — bukan overhead
-framework. Delta yang sebanding adalah baris param (+89), di mana kedua
-pihak sama-sama mengakses path.
+Catatan: baseline statis "bare" (42ns) tidak pernah memanggil `ctx.Path()`,
+jadi ia tidak membayar `URI.parse` + `normalizePath`; delta +71 di baris
+itu bukan overhead framework, melainkan parsing path yang wajib untuk
+router berbasis path. Setelah fast-path, TurboGo bahkan lebih cepat dari
+baseline bare yang sama-sama mengakses path (155 vs 166).
 
-Anggaran biaya per request (param route): `Context` lifecycle ~21ns,
-defer+recover ~4ns, router `FindInto` ~46ns, sisanya ~18ns (baca param,
-dispatch, konversi string). TurboGo adalah lapisan tertipis di antara
-ketiganya; target optimasi berikutnya adalah 46ns router itu — dinilai
-lewat microbench, bukan wrk.
+### Path parsing fast-path
+
+Profil in-process menunjukkan `URI.parse` + `normalizePath` menyerap
+~55% + 32% CPU handler. Untuk mayoritas request target keduanya no-op,
+jadi router memakai request target mentah bila normalisasi **terbukti**
+tidak akan mengubahnya (tidak ada `%`, `\`, `//`, `/./`, `/..`, byte CTL;
+target diawali `/`; query/fragment dipotong):
+
+| | ns/op |
+|---|---|
+| `ctx.Path()` (parse + normalize) | 92 |
+| `routePath` (guard + pakai target mentah) | 14 |
+| hemat | **~78 ns/request (-85%)** |
+
+Equivalence dijaga oleh test diferensial 50k target acak
+(`app_path_test.go`): bila fast-path dipakai, hasilnya wajib identik
+dengan `ctx.Path()`; bila tidak, fallback ke `ctx.Path()`. Tidak ada
+mismatch, 23.794 fast / 26.244 fallback.
+
+Efek ke RPS (run ulang, c=200 t=6, median 5): turbogo 447k, fasthttp
+449k, fiber3 441k — paritas, urutan tidak berubah. Variasi antar-run
+(±15%) jauh lebih besar dari efek ini, konsisten dengan beban yang
+syscall-bound.
 
 ## Fast path TurboGo (GetFast / raw fasthttp handler)
 
