@@ -9,7 +9,7 @@ require (
 	github.com/gofiber/fiber/v3 v3.0.0-beta.4
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/labstack/echo/v4 v4.16.3
-	github.com/labstack/echo/v5 v5.3.1
+	github.com/labstack/echo/v5 v5.4.4
 	github.com/valyala/fasthttp v1.77.0
 )
 
