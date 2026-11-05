@@ -1,6 +1,6 @@
 # TurboGo
 
-[![Go](https://img.shields.io/badge/Go-1.25-blue)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.26-blue)](https://go.dev)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
 [![Go Report Card](https://goreportcard.com/badge/github.com/Dziqha/TurboGo)](https://goreportcard.com/report/github.com/Dziqha/TurboGo)
 [![Coverage](https://img.shields.io/badge/Coverage-51.9%25-yellow)](https://github.com/Dziqha/TurboGo/actions)
