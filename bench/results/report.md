@@ -90,6 +90,35 @@ Bukti exactness: `fuzz_test.go` differential `FindInto` vs `Find`
 (2 mode: tree + compiled, 20k path acak + 10 method) → **0 mismatch**;
 overflow >8 param diuji terpisah. `go test -race` hijau.
 
+## Framework overhead in-process (tanpa network, `bench/inproc`)
+
+Setiap framework dipanggil sebagai `fasthttp.RequestHandler` dengan
+`RequestCtx` yang dipakai ulang (reset request/response per iterasi,
+`GET /user/42`). Ini mengisolasi lapisan framework dari syscall:
+
+| Kasus | ns/op | Delta vs bare |
+|-------|-------|---------------|
+| bare fasthttp (path + switch) | 166 | — |
+| **turbogo param** | **255** | **+89** |
+| fiber v2 | 267 | +101 |
+| fiber v3 | 308 | +142 |
+| bare fasthttp static (tanpa akses path) | 42 | — |
+| turbogo static | 203 | +161 |
+
+Catatan penting: baseline statis "bare" tidak pernah memanggil
+`ctx.Path()`, jadi ia **tidak** membayar `URI.parse` + `normalizePath`.
+Profil run in-process: `URI.parse` 55% cumulative, `normalizePath` 32%.
+Artinya delta +161 di baris statis hampir seluruhnya biaya parsing path
+yang wajib dibayar router berbasis path mana pun — bukan overhead
+framework. Delta yang sebanding adalah baris param (+89), di mana kedua
+pihak sama-sama mengakses path.
+
+Anggaran biaya per request (param route): `Context` lifecycle ~21ns,
+defer+recover ~4ns, router `FindInto` ~46ns, sisanya ~18ns (baca param,
+dispatch, konversi string). TurboGo adalah lapisan tertipis di antara
+ketiganya; target optimasi berikutnya adalah 46ns router itu — dinilai
+lewat microbench, bukan wrk.
+
 ## Fast path TurboGo (GetFast / raw fasthttp handler)
 
 | Endpoint | RPS | p50 (ms) | p99 (ms) |

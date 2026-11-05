@@ -114,9 +114,7 @@ func (a *App) Route(path string) *router.Route {
 }
 
 func (a *App) newServer() *fasthttp.Server {
-	// Freeze routing into the compiled-switch table before serving.
-	// Later Add calls mark it dirty and it rebuilds lazily.
-	a.singleRouter.SetCompiled(true)
+	// Handler() freezes routing into the compiled-switch table (see there).
 	srv := &fasthttp.Server{
 		Handler:                       a.Handler(),
 		Logger:                        log.New(io.Discard, "", 0),
@@ -184,6 +182,10 @@ func (a *App) RunWithGracefulShutdown(addr string) error {
 }
 
 func (a *App) Handler() fasthttp.RequestHandler {
+	// Freeze routing like newServer does, so mounting Handler() under a
+	// custom fasthttp server gets the compiled table too. Late routes
+	// still mark it dirty and rebuild lazily.
+	a.singleRouter.SetCompiled(true)
 	return func(ctx *fasthttp.RequestCtx) {
 		method := b2s(ctx.Method())
 		path := b2s(ctx.Path())
