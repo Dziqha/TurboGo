@@ -29,7 +29,7 @@ require (
 
 require (
 	github.com/fatih/color v1.18.0
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/stretchr/testify v1.11.1
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
