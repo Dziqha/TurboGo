@@ -1,3 +1,4 @@
+// Deprecated: TurboGo is now Ply. Use github.com/Dziqha/ply instead.
 package TurboGo
 
 import (

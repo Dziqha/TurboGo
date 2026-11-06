@@ -1,5 +1,12 @@
 # TurboGo
 
+> [!IMPORTANT]
+> **TurboGo is now Ply.** Development continues at
+> [github.com/Dziqha/ply](https://github.com/Dziqha/ply).
+> Install with `go get github.com/Dziqha/ply@latest`; migration is the
+> import path plus `TurboGo.New()` -> `ply.New()`.
+> TurboGo `v1.1.2` is the final release.
+
 [![Go](https://img.shields.io/badge/Go-1.26-blue)](https://go.dev)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-PASS-brightgreen)]()
 [![Go Report Card](https://goreportcard.com/badge/github.com/Dziqha/TurboGo)](https://goreportcard.com/report/github.com/Dziqha/TurboGo)
